@@ -59,10 +59,8 @@ if submit:
 # --- Filtry ---
 st.header("Správa odvolání")
 if admin_mode:
-    # Admin vidí všechna odvolání
     df_filtered = st.session_state.df.copy()
 else:
-    # Hráči vidí jen svá odvolání
     hrac_input = st.text_input("Zadej své Minecraft jméno pro zobrazení odvolání")
     if hrac_input:
         df_filtered = st.session_state.df[st.session_state.df["Hráč"] == hrac_input]
@@ -72,7 +70,7 @@ else:
 status_filter = st.multiselect(
     "Filtr podle statusu",
     ["Čeká", "Schváleno", "Zamítnuto"],
-    default=["Čeká", "Schváleno", "Zamítnuto"] if admin_mode else ["Čeká", "Schváleno", "Zamítnuto"]
+    default=["Čeká", "Schváleno", "Zamítnuto"]
 )
 priorita_filter = st.multiselect(
     "Filtr podle priority",
@@ -86,7 +84,7 @@ df_filtered = df_filtered[
 
 # --- Editace odvolání ---
 st.subheader("Úpravy odvolání")
-if admin_mode:
+if admin_mode and not df_filtered.empty:
     edited_df = st.data_editor(
         df_filtered,
         use_container_width=True,
@@ -101,11 +99,39 @@ if admin_mode:
         },
         disabled=["ID", "Hráč", "Důvod", "Datum"]
     )
-    # Uložit změny
     st.session_state.df.update(edited_df)
     st.session_state.df.to_csv("odvolani.csv", index=False)
 
-# --- Smazání odvolání (jen admin) ---
+# --- Status editor (per-row) ---
+if admin_mode and not df_filtered.empty:
+    st.subheader("Editor statusů (per-row)")
+    status_edit_df = st.data_editor(
+        st.session_state.df[["ID", "Hráč", "Status"]],
+        column_config={
+            "Status": st.column_config.SelectboxColumn(
+                "Status",
+                options=["Čeká", "Schváleno", "Zamítnuto"],
+                required=True
+            )
+        },
+        disabled=["ID", "Hráč"],
+        use_container_width=True,
+        hide_index=True
+    )
+    st.session_state.df["Status"] = status_edit_df["Status"]
+    st.session_state.df.to_csv("odvolani.csv", index=False)
+
+# --- Bulk status change ---
+if admin_mode:
+    st.subheader("Hromadné změny statusů")
+    bulk_status = st.selectbox("Nový status pro vybrané odvolání", ["Čeká", "Schváleno", "Zamítnuto"])
+    selected_ids = st.multiselect("Vyber odvolání k hromadné změně", st.session_state.df["ID"])
+    if st.button("Změnit status vybraných"):
+        st.session_state.df.loc[st.session_state.df["ID"].isin(selected_ids), "Status"] = bulk_status
+        st.session_state.df.to_csv("odvolani.csv", index=False)
+        st.success(f"Statusy {len(selected_ids)} odvolání byly aktualizovány ✅")
+
+# --- Delete appeals (admin only) ---
 if admin_mode:
     st.subheader("Smazání odvolání")
     delete_ids = []
