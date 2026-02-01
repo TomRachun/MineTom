@@ -22,16 +22,24 @@ COLUMNS = [
     "Komentář_admina"
 ]
 
-# ─── LOAD DATA FUNCTION ─────────────────────────────────
+# ─── LOAD DATA ───────────────────────────────────────────
 def load_data():
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE)
-        for c in COLUMNS:
-            if c not in df.columns:
-                df[c] = ""
-        return df
-    df = pd.DataFrame(columns=COLUMNS)
-    df.to_csv(DATA_FILE, index=False)
+    else:
+        df = pd.DataFrame(columns=COLUMNS)
+        df.to_csv(DATA_FILE, index=False)
+
+    # Ensure all columns exist
+    for col in COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+
+    # FORCE TEXT COLUMN (FIX)
+    df["Komentář_admina"] = df["Komentář_admina"].astype(str).fillna("")
+    df["Odvolání"] = df["Odvolání"].astype(str).fillna("")
+    df["Status_odvolání"] = df["Status_odvolání"].astype(str).fillna("")
+
     return df
 
 st.session_state.df = load_data()
@@ -75,14 +83,16 @@ if player_name:
 
             rows.append({
                 "ID": r["ID"],
-                "Důvod": r["Důvod_trestu"],
+                "Důvod trestu": r["Důvod_trestu"],
                 "Zbývá": remaining,
-                "Status": r["Status_trestu"],
-                "Odvolání": r["Status_odvolání"]
+                "Status trestu": r["Status_trestu"],
+                "Status odvolání": r["Status_odvolání"],
+                "Komentář admina": r["Komentář_admina"]
             })
 
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
+        # ─── APPEAL FORM ──────────────────────────────────
         st.subheader("📨 Podat odvolání")
         with st.form("appeal_form"):
             appeal_text = st.text_area("Text odvolání")
@@ -100,10 +110,10 @@ if admin_mode:
     st.divider()
     st.header("🛠️ Admin panel")
 
-    # ─── REFRESH BUTTON ──────────────────────────────────
+    # ─── REFRESH ─────────────────────────────────────────
     if st.button("🔄 Refresh dat"):
         st.session_state.df = load_data()
-        st.success("Data znovu načtena z CSV")
+        st.success("Data znovu načtena")
 
     # ─── ADD CASE ────────────────────────────────────────
     with st.form("add_case"):
@@ -138,29 +148,14 @@ if admin_mode:
             st.success("Trest přidán")
 
     # ─── BULK DAY ADDER ──────────────────────────────────
-    st.subheader("➕ Přičíst / odečíst dny (podle ID)")
+    st.subheader("➕ Přičíst / odečíst dny")
 
-    case_ids = st.text_input(
-        "ID případů (oddělené čárkou, např. 1,2,5)"
-    )
-
-    target = st.selectbox(
-        "Co upravit",
-        ["Odslouženo", "Celkem_dní"]
-    )
-
-    delta = st.number_input(
-        "Kolik dní přičíst / odečíst (− = odebrat)",
-        step=1
-    )
+    case_ids = st.text_input("ID případů (např. 1,2,5)")
+    target = st.selectbox("Co upravit", ["Odslouženo", "Celkem_dní"])
+    delta = st.number_input("Změna dní (+ / -)", step=1)
 
     if st.button("Použít změnu"):
-        ids = []
-        for x in case_ids.split(","):
-            x = x.strip()
-            if x.isdigit():
-                ids.append(int(x))
-
+        ids = [int(x.strip()) for x in case_ids.split(",") if x.strip().isdigit()]
         if not ids:
             st.error("Neplatná ID")
         else:
@@ -168,11 +163,10 @@ if admin_mode:
             st.session_state.df.loc[mask, target] = (
                 st.session_state.df.loc[mask, target].astype(int) + int(delta)
             ).clip(lower=0)
-
             st.session_state.df.to_csv(DATA_FILE, index=False)
             st.success(f"Upraveno {mask.sum()} případů")
 
-    # ─── EDIT TABLE ──────────────────────────────────────
+    # ─── FULL EDITOR ─────────────────────────────────────
     st.subheader("📋 Kompletní editor")
 
     edited = st.data_editor(
@@ -186,7 +180,10 @@ if admin_mode:
             "Status_odvolání": st.column_config.SelectboxColumn(
                 "Status odvolání",
                 options=["", "Čeká", "Schváleno", "Zamítnuto"]
-            )
+            ),
+            "Komentář_admina": st.column_config.TextColumn(
+                "Komentář admina"
+            ),
         },
         use_container_width=True
     )
