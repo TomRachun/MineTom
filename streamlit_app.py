@@ -22,17 +22,19 @@ COLUMNS = [
     "Komentář_admina"
 ]
 
-# ─── LOAD DATA ───────────────────────────────────────────
-if os.path.exists(DATA_FILE):
-    df = pd.read_csv(DATA_FILE)
-    for col in COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-else:
+# ─── LOAD DATA FUNCTION ─────────────────────────────────
+def load_data():
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE)
+        for c in COLUMNS:
+            if c not in df.columns:
+                df[c] = ""
+        return df
     df = pd.DataFrame(columns=COLUMNS)
     df.to_csv(DATA_FILE, index=False)
+    return df
 
-st.session_state.df = df
+st.session_state.df = load_data()
 
 # ─── ADMIN LOGIN ─────────────────────────────────────────
 st.sidebar.header("Admin")
@@ -72,7 +74,8 @@ if player_name:
                 remaining = max(0, int(r["Celkem_dní"]) - served)
 
             rows.append({
-                "Důvod trestu": r["Důvod_trestu"],
+                "ID": r["ID"],
+                "Důvod": r["Důvod_trestu"],
                 "Zbývá": remaining,
                 "Status": r["Status_trestu"],
                 "Odvolání": r["Status_odvolání"]
@@ -80,10 +83,9 @@ if player_name:
 
         st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
-        # ─── APPEAL FORM ──────────────────────────────────
         st.subheader("📨 Podat odvolání")
         with st.form("appeal_form"):
-            appeal_text = st.text_area("Napiš odvolání")
+            appeal_text = st.text_area("Text odvolání")
             send = st.form_submit_button("Odeslat")
 
         if send and appeal_text:
@@ -98,7 +100,12 @@ if admin_mode:
     st.divider()
     st.header("🛠️ Admin panel")
 
-    # ADD JAIL CASE
+    # ─── REFRESH BUTTON ──────────────────────────────────
+    if st.button("🔄 Refresh dat"):
+        st.session_state.df = load_data()
+        st.success("Data znovu načtena z CSV")
+
+    # ─── ADD CASE ────────────────────────────────────────
     with st.form("add_case"):
         st.subheader("Přidat trest")
         hrac = st.text_input("Hráč")
@@ -130,40 +137,74 @@ if admin_mode:
             st.session_state.df.to_csv(DATA_FILE, index=False)
             st.success("Trest přidán")
 
-    # EDIT CASES + APPEALS
-    if not st.session_state.df.empty:
-        st.subheader("Úpravy trestů a odvolání")
+    # ─── BULK DAY ADDER ──────────────────────────────────
+    st.subheader("➕ Přičíst / odečíst dny (podle ID)")
 
-        edited = st.data_editor(
-            st.session_state.df,
-            disabled=["ID", "Hráč", "Datum_trestu"],
-            column_config={
-                "Status_trestu": st.column_config.SelectboxColumn(
-                    "Status trestu",
-                    options=["Aktivní", "Ukončen"]
-                ),
-                "Status_odvolání": st.column_config.SelectboxColumn(
-                    "Status odvolání",
-                    options=["", "Čeká", "Schváleno", "Zamítnuto"]
-                )
-            },
-            use_container_width=True
-        )
+    case_ids = st.text_input(
+        "ID případů (oddělené čárkou, např. 1,2,5)"
+    )
 
-        if st.button("Uložit změny"):
-            st.session_state.df = edited
+    target = st.selectbox(
+        "Co upravit",
+        ["Odslouženo", "Celkem_dní"]
+    )
+
+    delta = st.number_input(
+        "Kolik dní přičíst / odečíst (− = odebrat)",
+        step=1
+    )
+
+    if st.button("Použít změnu"):
+        ids = []
+        for x in case_ids.split(","):
+            x = x.strip()
+            if x.isdigit():
+                ids.append(int(x))
+
+        if not ids:
+            st.error("Neplatná ID")
+        else:
+            mask = st.session_state.df["ID"].isin(ids)
+            st.session_state.df.loc[mask, target] = (
+                st.session_state.df.loc[mask, target].astype(int) + int(delta)
+            ).clip(lower=0)
+
             st.session_state.df.to_csv(DATA_FILE, index=False)
-            st.success("Uloženo")
+            st.success(f"Upraveno {mask.sum()} případů")
 
-        # DELETE
-        st.subheader("Smazat trest")
-        del_id = st.selectbox("Vyber ID", st.session_state.df["ID"])
-        if st.button("Smazat"):
-            st.session_state.df = st.session_state.df[
-                st.session_state.df["ID"] != del_id
-            ]
-            st.session_state.df.to_csv(DATA_FILE, index=False)
-            st.success("Smazáno")
+    # ─── EDIT TABLE ──────────────────────────────────────
+    st.subheader("📋 Kompletní editor")
+
+    edited = st.data_editor(
+        st.session_state.df,
+        disabled=["ID", "Hráč", "Datum_trestu"],
+        column_config={
+            "Status_trestu": st.column_config.SelectboxColumn(
+                "Status trestu",
+                options=["Aktivní", "Ukončen"]
+            ),
+            "Status_odvolání": st.column_config.SelectboxColumn(
+                "Status odvolání",
+                options=["", "Čeká", "Schváleno", "Zamítnuto"]
+            )
+        },
+        use_container_width=True
+    )
+
+    if st.button("💾 Uložit tabulku"):
+        st.session_state.df = edited
+        st.session_state.df.to_csv(DATA_FILE, index=False)
+        st.success("Uloženo")
+
+    # ─── DELETE ──────────────────────────────────────────
+    st.subheader("🗑️ Smazat trest")
+    del_id = st.selectbox("Vyber ID", st.session_state.df["ID"])
+    if st.button("Smazat"):
+        st.session_state.df = st.session_state.df[
+            st.session_state.df["ID"] != del_id
+        ]
+        st.session_state.df.to_csv(DATA_FILE, index=False)
+        st.success("Smazáno")
 
 
 
