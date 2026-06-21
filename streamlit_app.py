@@ -326,7 +326,6 @@ with tab1:
                 text_input = st.text_input(T["enchants_placeholder"])
                 enchants = [e.strip() for e in text_input.split(",") if e.strip()]
             
-            # --- UPDATED FORMAT OPTIONS ---
             listing_type = st.radio(T["format"], ["Standard Fix Price", "Flash Sale / Discount", "Scheduled Sale Delay", "Auction (Bidding)"])
             
             st.markdown(T["duration_settings"])
@@ -358,8 +357,11 @@ with tab1:
                 delay_amount = st.number_input("Delay Count Duration", min_value=1, value=15)
                 delay_unit = st.selectbox("Delay Time Units", ["Minutes", "Hours", "Days"])
                 
+                # Real-Time Percentage Math Preview Box
                 calculated_markdown = round(base_price_val * (1 - delay_pct / 100))
-                price_string = f"{base_price_val} Diamonds" # Evaluated real-time on view down below
+                st.info(f"📊 **Live Math Preview:** Price will automatically drop from {base_price_val} 💎 down to **{calculated_markdown} Diamonds** ({delay_pct}% off) when the countdown finishes.")
+                
+                price_string = f"{base_price_val} Diamonds"
                 sale_price_val = f"DELAYED_{delay_pct}_{base_price_val}"
                 sale_at_val = (datetime.now() + calculate_delta(delay_amount, delay_unit)).isoformat()
             else:
@@ -382,29 +384,48 @@ with tab1:
                     save_sheet_data(st.session_state.df_trades, "trades")
                     st.rerun()
 
-        # EXPANDER 2: APPLY SALE TO EXISTING / CURRENT RUNNING ITEMS
+        # EXPANDER 2: MANAGEMENT PANEL (SET FREE & PERCENTAGE APPLIER)
         if not df_trades.empty and 'seller' in df_trades.columns:
             user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == st.session_state.current_user.lower()) & (df_trades['is_auction'] == False)]
             if not user_items.empty:
-                with st.expander("🏷️ Shop Owner Control Panel: Put Active Items on Sale"):
-                    item_options = {f"ID {r['id']} - {r['item']} ({r['amount']}x)": r['id'] for _, r in user_items.iterrows()}
-                    selected_target_str = st.selectbox("Choose running item to discount:", list(item_options.keys()))
+                with st.expander("🏷️ Shop Owner Control Panel: Modify Running Items"):
+                    item_options = {f"ID {r['id']} - {r['item']} ({r['amount']}x) [Current: {r['price']}]": r['id'] for _, r in user_items.iterrows()}
+                    selected_target_str = st.selectbox("Choose active item:", list(item_options.keys()))
                     target_id = item_options[selected_target_str]
+                    matching_idx = df_trades[df_trades['id'] == target_id].index[0]
+                    orig_price_str = df_trades.at[matching_idx, 'price']
+                    orig_num = extract_numeric_price(orig_price_str)
                     
-                    instant_discount_pct = st.slider("Apply Discount Amount (%)", 5, 90, 20)
-                    if st.button("Apply Discount Instantly"):
-                        matching_idx = df_trades[df_trades['id'] == target_id].index[0]
-                        orig_price_str = df_trades.at[matching_idx, 'price']
-                        orig_num = extract_numeric_price(orig_price_str)
+                    col_pct, col_free = st.columns(2)
+                    
+                    with col_pct:
+                        st.markdown("##### Apply Percentage Discount")
+                        instant_discount_pct = st.slider("Select Discount Percentage (%)", 5, 95, 20)
+                        
+                        # Real-Time Percentage Math Preview Box for Active items
                         if orig_num > 0:
-                            new_markdown = round(orig_num * (1 - instant_discount_pct / 100))
-                            df_trades.at[matching_idx, 'price'] = f"🔥 SALE: {new_markdown} Diamonds (Was {orig_num} 💎)"
-                            df_trades.at[matching_idx, 'sale_price'] = str(new_markdown)
+                            preview_calc = round(orig_num * (1 - instant_discount_pct / 100))
+                            st.write(f"New targeted price will be: **{preview_calc} 💎**")
+                        
+                        if st.button("Apply Markdown Price", use_container_width=True):
+                            if orig_num > 0:
+                                new_markdown = round(orig_num * (1 - instant_discount_pct / 100))
+                                df_trades.at[matching_idx, 'price'] = f"🔥 SALE: {new_markdown} Diamonds (Was {orig_num} 💎)"
+                                df_trades.at[matching_idx, 'sale_price'] = str(new_markdown)
+                                df_trades.at[matching_idx, 'sale_at'] = datetime.now().isoformat()
+                                save_sheet_data(df_trades, "trades")
+                                st.success("Discount applied successfully!")
+                                st.rerun()
+                                
+                    with col_free:
+                        st.markdown("##### Clear Out Item Price")
+                        st.write("Instantly make this active trade entirely free for any player to grab.")
+                        if st.button("🎁 Set Item to Free", type="primary", use_container_width=True):
+                            df_trades.at[matching_idx, 'price'] = "🎁 FREE / DAROVÁNO"
+                            df_trades.at[matching_idx, 'sale_price'] = "0"
                             df_trades.at[matching_idx, 'sale_at'] = datetime.now().isoformat()
-                            
-                            st.session_state.df_trades = df_trades
                             save_sheet_data(df_trades, "trades")
-                            st.success("Discount active!")
+                            st.success("Listing updated to Free!")
                             st.rerun()
 
     st.subheader(T["active_listings"])
@@ -431,7 +452,6 @@ with tab1:
                         orig_val = int(parts[2])
                         discounted_val = round(orig_val * (1 - pct_val / 100))
                         
-                        # Apply live update to data state
                         display_price = f"🔥 SALE: {discounted_val} Diamonds (Was {orig_val} 💎)"
                         df_trades.at[idx, 'price'] = display_price
                         df_trades.at[idx, 'sale_price'] = str(discounted_val)
@@ -464,14 +484,14 @@ with tab1:
                         code_success_msg = "ALREADY_USED"
                     else:
                         base_num = extract_numeric_price(display_price)
-                        display_price = f"✨ {round(base_num * (1 - discount_amt / 100))} Diamonds ({discount_amt}% OFF)"
+                        if "FREE" not in display_price.upper():
+                            display_price = f"✨ {round(base_num * (1 - discount_amt / 100))} Diamonds ({discount_amt}% OFF)"
                         code_success_msg = f"{T['code_success']}"
 
             with col1:
                 st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({row['amount']}x)**")
                 st.markdown(f"Price: **{display_price}**")
                 
-                # Show timer badge for upcoming sales
                 if "DELAYED_" in sale_price_field and datetime.now() < datetime.fromisoformat(sale_at_field):
                     st.info(f"⏳ Scheduled Markdown starting in: {format_time_remaining(sale_at_field)}")
                     
