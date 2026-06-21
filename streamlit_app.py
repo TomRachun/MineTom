@@ -91,15 +91,15 @@ def extract_numeric_price(price_str):
     except:
         return 0
 
-# Helper to compute exact final sales prices strings
+# Helper to compute exact final sales prices strings with percentage markup
 def calculate_sale_display(base_val, sale_mode, pct_off):
     if sale_mode == "Make Free":
-        return "Free"
+        return "Free (100% OFF)"
     if pct_off == 100:
-        return "Free"
+        return "Free (100% OFF)"
     clean_base = extract_numeric_price(base_val)
     final_num = round(clean_base * (1 - pct_off / 100))
-    return f"{final_num} Diamonds"
+    return f"{final_num} Diamonds ({pct_off}% OFF)"
 
 # Initialize dataframes into session state if not already done
 if "df_users" not in st.session_state:
@@ -198,8 +198,9 @@ with tab1:
                     discount_pct = 0
                     if sale_mode == "Percentage Off (1-100%)":
                         discount_pct = st.slider("Select Discount %", min_value=1, max_value=100, value=20, key="sched_pct")
+                    else:
+                        discount_pct = 100
                     
-                    # Live Preview Output before saving
                     calculated_price = calculate_sale_display(base_price_val, sale_mode, discount_pct)
                     st.info(f"📊 **Sale Preview:** Price will drop from {base_price_val} Diamonds to **{calculated_price}**")
                     
@@ -306,7 +307,6 @@ with tab1:
                 
                 # --- PORTAL TO MODIFY OR REMOVE SALES ---
                 if not is_item_auction and (is_seller or is_admin):
-                    # Show Remove Sale button if one is configured/active
                     if has_any_sale_configured:
                         if st.button("🏷️ Remove Sale", key=f"rm_sale_{row['id']}", help="Wipes discount settings and restores base cost"):
                             df_trades.at[idx, 'sale_price'] = ""
@@ -323,8 +323,9 @@ with tab1:
                             inst_pct = 0
                             if inst_mode == "Percentage Off":
                                 inst_pct = st.slider("Select Cut %", 1, 100, 25, key=f"inst_sld_{row['id']}")
+                            else:
+                                inst_pct = 100
                             
-                            # Real-time calculation preview
                             preview_price = calculate_sale_display(row['price'], inst_mode, inst_pct)
                             st.caption(f"Will change price to: **{preview_price}**")
                             
