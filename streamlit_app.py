@@ -5,7 +5,6 @@ from datetime import datetime, date, timedelta
 import time
 
 # ─── AUTO-REFRESH CONFIGURATION ──────────────────────────────────
-# Automatically rerun the app state every 30 seconds to update live countdown timers
 if "last_refresh" not in st.session_state:
     st.session_state.last_refresh = time.time()
 
@@ -13,18 +12,17 @@ if "last_refresh" not in st.session_state:
 MAX_TPS = 3
 TODAY = str(date.today())
 
-# Minecraft Item Price Guide Data (Suggested Values in Diamonds)
 PRICE_SUGGESTIONS = {
     "Netherite Ingot": 8,
     "Diamond Block": 9,
-    "Elytra": 150,
-    "Shulker Box": 20,
-    "Enchanted Golden Apple": 50,
-    "Beacon": 60,
-    "Totem of Undying": 30,
+    "Elytra": 15,
+    "Shulker Box": 4,
+    "Enchanted Golden Apple": 10,
+    "Beacon": 20,
+    "Totem of Undying": 3,
     "Nether Star": 16,
     "Ancient Debris": 2,
-    "Mending Book": 50,
+    "Mending Book": 5,
     "Custom Item / Jiný předmět": 0
 }
 
@@ -39,7 +37,7 @@ LOCALES = {
         "login": "Login",
         "register": "Register",
         "logout": "Logout",
-        "tabs": ["🛒 Trade Store", "📜 Case Records", "⚡ Teleport Tracker"],
+        "tabs": ["🛒 Trade Store", "📜 Case Records", "⚡ Teleport Tracker", "🎟️ Sale Codes"],
         "marketplace": "Server Marketplace",
         "create_listing": "➕ Create Listing (Sale / Sale Delay / Auction)",
         "item_name": "Item Selection",
@@ -76,7 +74,22 @@ LOCALES = {
         "apply_now": "Apply Sale Now",
         "remove_sale": "🏷️ Remove Sale",
         "remove_listing": "❌ Remove Listing",
-        "refresh_btn": "🔄 Force Refresh Data"
+        "refresh_btn": "🔄 Force Refresh Data",
+        "code_header": "🎟️ Promo & Sale Codes Manager",
+        "create_code": "➕ Create New Sale Code",
+        "code_input": "Sale Code Name (e.g. SUMMER25)",
+        "code_pct": "Discount Percentage",
+        "code_scope": "Code Target Scope",
+        "scope_global": "Global (All your items)",
+        "scope_admin_global": "Admin Global (All marketplace items)",
+        "scope_specific": "Specific Listing IDs only",
+        "specific_help": "Enter comma separated IDs (e.g. 1, 4, 12)",
+        "btn_create_code": "Generate Code",
+        "active_codes": "Active Sale Codes",
+        "code_table_cols": ["Code", "Creator", "Discount", "Scope / IDs"],
+        "use_code_input": "Enter Sale Code",
+        "code_success": "✅ Code Applied! Price updated.",
+        "code_invalid": "❌ Code invalid for this item."
     },
     "Čeština": {
         "title": "⛏️ Minecraft Server Portál Správy",
@@ -87,7 +100,7 @@ LOCALES = {
         "login": "Přihlásit se",
         "register": "Registrovat",
         "logout": "Odhlásit se",
-        "tabs": ["🛒 Obchod / Tržiště", "📜 Záznamy Trestů", "⚡ Teleport Tracker"],
+        "tabs": ["🛒 Obchod / Tržiště", "📜 Záznamy Trestů", "⚡ Teleport Tracker", "🎟️ Slevové Kódy"],
         "marketplace": "Serverové Tržiště",
         "create_listing": "➕ Vytvořit Nabídku (Sleva / Zpožděný prodej / Aukce)",
         "item_name": "Výběr Předmětu",
@@ -124,39 +137,49 @@ LOCALES = {
         "apply_now": "Použít Slevu Ihned",
         "remove_sale": "🏷️ Odstranit Slevu",
         "remove_listing": "❌ Odstranit Nabídku",
-        "refresh_btn": "🔄 Vynutit Obnovení Dat"
+        "refresh_btn": "🔄 Vynutit Obnovení Dat",
+        "code_header": "🎟️ Správce Slevových Kódů",
+        "create_code": "➕ Vytvořit Nový Slevový Kód",
+        "code_input": "Název kódu (např. SLEVA20)",
+        "code_pct": "Výše slevy v procentech",
+        "code_scope": "Rozsah Platnosti Kódu",
+        "scope_global": "Globální (Všechny moje předměty)",
+        "scope_admin_global": "Admin Globální (Všechny předměty na trhu)",
+        "scope_specific": "Pouze specifické ID nabídek",
+        "specific_help": "Zadejte ID oddělená čárkou (např. 1, 4, 12)",
+        "btn_create_code": "Generovat Kód",
+        "active_codes": "Aktivní Slevové Kódy",
+        "code_table_cols": ["Kód", "Tvůrce", "Sleva", "Rozsah / ID"],
+        "use_code_input": "Zadejte slevový kód",
+        "code_success": "✅ Kód uplatněn! Cena byla upravena.",
+        "code_invalid": "❌ Neplatný slevový kód pro tuto položku."
     }
 }
 
-# ─── SIDEBAR CONFIGURATION & LANGUAGE SELECTOR ───────────────────
 st.sidebar.header("🌐 Language / Jazyk")
 lang = st.sidebar.selectbox("Choose Language", ["English", "Čeština"])
 T = LOCALES[lang]
 
 st.title(T["title"])
 
-# Validate that the secrets URL exists
 if "public_gsheets_url" not in st.secrets:
     st.error("Missing configuration. Please check your public_gsheets_url in Streamlit Secrets.")
     st.stop()
 
-# Base sheet URL processing
 base_url = st.secrets["public_gsheets_url"]
 if "/edit" in base_url:
     base_url = base_url.split("/edit")[0]
 if not base_url.endswith("/"):
     base_url += "/"
 
-# Helper function to read worksheets directly using Pandas native CSV engine
 def get_sheet_data(worksheet_name):
     csv_url = f"{base_url}gviz/tq?tqx=out:csv&sheet={worksheet_name}"
     try:
         return pd.read_csv(csv_url)
-    except Exception as e:
-        st.error(f"Failed to read tab '{worksheet_name}'.")
-        st.stop()
+    except:
+        # Fallback if custom tab doesn't exist yet
+        return pd.DataFrame()
 
-# Helper function to write rows back via your Google web app script
 def save_sheet_data(df, worksheet_name):
     if "gsheets_write_url" not in st.secrets:
         return
@@ -165,6 +188,8 @@ def save_sheet_data(df, worksheet_name):
         cols = ["username", "password"]
     elif worksheet_name == "trades":
         cols = ["id", "seller", "item", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
+    elif worksheet_name == "codes":
+        cols = ["code", "creator", "discount", "target_ids"]
     elif worksheet_name == "tps":
         cols = ["username", "remaining_tps"]
         if "username_clean" in df.columns:
@@ -181,9 +206,8 @@ def save_sheet_data(df, worksheet_name):
     try:
         requests.post(st.secrets["gsheets_write_url"], json=payload)
     except:
-        st.error("Write-back connection failed.")
+        pass
 
-# Helper to convert dynamic input times to timedelta objects
 def calculate_delta(amount, unit):
     if unit in ["Minutes", "Minuty"]:
         return timedelta(minutes=amount)
@@ -192,7 +216,6 @@ def calculate_delta(amount, unit):
     else:
         return timedelta(days=amount)
 
-# Helper to easily show human-readable remaining time
 def format_time_remaining(target_iso):
     if pd.isna(target_iso) or str(target_iso).strip() in ["", "nan", "Permanent"]:
         return T["forever"]
@@ -210,7 +233,6 @@ def format_time_remaining(target_iso):
     except:
         return T["forever"]
 
-# Helper to pull numeric values from item text strings safely
 def extract_numeric_price(price_str):
     try:
         clean_num = int(''.join(filter(str.isdigit, str(price_str))))
@@ -218,7 +240,6 @@ def extract_numeric_price(price_str):
     except:
         return 0
 
-# Helper to compute exact final sales prices strings with percentage markup
 def calculate_sale_display(base_val, sale_mode, pct_off):
     if sale_mode in ["Make Free", "Zdarma"] or pct_off == 100:
         return "Free (100% OFF)" if lang == "English" else "Zdarma (100% SLEVA)"
@@ -228,22 +249,23 @@ def calculate_sale_display(base_val, sale_mode, pct_off):
     off_suffix = "OFF" if lang == "English" else "SLEVA"
     return f"{final_num} {suffix} ({pct_off}% {off_suffix})"
 
-# Initialize dataframes into session state if not already done
+# Initialize structures
 if "df_users" not in st.session_state:
     st.session_state.df_users = get_sheet_data("users")
 if "df_trades" not in st.session_state:
     st.session_state.df_trades = get_sheet_data("trades")
+if "df_codes" not in st.session_state:
+    st.session_state.df_codes = get_sheet_data("codes")
 if "df_tps" not in st.session_state:
     st.session_state.df_tps = get_sheet_data("tps")
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
-# ─── AUTOMATIC TIMER CLEANUP ──────────────────────────────────────
+# Timer cleanup
 df_trades_current = st.session_state.df_trades
 if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
     now_str = datetime.now().isoformat()
     expires_str_series = df_trades_current["expires_at"].astype(str).str.strip()
-    
     valid_trades = df_trades_current[
         (df_trades_current["expires_at"].isna()) | 
         (expires_str_series == "") | 
@@ -255,12 +277,12 @@ if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
         st.session_state.df_trades = valid_trades
         save_sheet_data(valid_trades, "trades")
 
-# ─── REFRESH ACTION BUTTON ────────────────────────────────────────
 if st.button(T["refresh_btn"], use_container_width=True):
     st.session_state.df_trades = get_sheet_data("trades")
+    st.session_state.df_codes = get_sheet_data("codes")
     st.rerun()
 
-# ─── SIDEBAR AUTHENTICATION ────────────────────────────────────────
+# Authentication UI
 st.sidebar.header(T["auth_header"])
 if st.session_state.current_user is None:
     auth_action = st.sidebar.radio(T["choose_action"], [T["login"], T["register"]])
@@ -294,21 +316,19 @@ else:
         st.session_state.current_user = None
         st.rerun()
 
-# ─── MAIN TABS INTERFACE ──────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(T["tabs"])
+tab1, tab2, tab3, tab4 = st.tabs(T["tabs"])
 
 # ==========================================
-# TAB 1: TRADE STORE
+# TAB 1: MARKETPLACE WITH PROMO CODE EVALUATION
 # ==========================================
 with tab1:
     st.header(T["marketplace"])
     df_trades = st.session_state.df_trades
+    df_codes = st.session_state.df_codes
     
     if st.session_state.current_user:
         with st.expander(T["create_listing"]):
-            # ITEM SELECTOR WITH SMART PRICE SUGGESTION
             selected_item_key = st.selectbox(T["item_name"], list(PRICE_SUGGESTIONS.keys()))
-            
             if selected_item_key == "Custom Item / Jiný předmět":
                 final_item_name = st.text_input(T["custom_item"])
                 suggested_val = 10
@@ -324,7 +344,6 @@ with tab1:
                 enchants = [e.strip() for e in text_input.split(",") if e.strip()]
             
             listing_type = st.radio(T["format"], [T["fixed_price"], T["auction_format"]])
-            
             st.markdown(T["duration_settings"])
             is_permanent = st.checkbox(T["stay_forever"], value=False)
             
@@ -339,20 +358,13 @@ with tab1:
                 
             if listing_type == T["fixed_price"]:
                 base_price_val = st.number_input(T["base_price"], min_value=1, value=suggested_val if suggested_val > 0 else 10)
-                
                 has_delayed_sale = st.checkbox(T["sched_sale"])
                 sale_price_val = ""
                 sale_at_val = ""
                 if has_delayed_sale:
                     st.markdown(T["adv_sale_header"])
                     sale_mode = st.radio(T["discount_type"], [T["pct_off_label"], T["make_free_label"]], key="sched_mode")
-                    
-                    discount_pct = 0
-                    if sale_mode == T["pct_off_label"]:
-                        discount_pct = st.slider("Select %", min_value=1, max_value=100, value=20, key="sched_pct")
-                    else:
-                        discount_pct = 100
-                    
+                    discount_pct = st.slider("Select %", min_value=1, max_value=100, value=20, key="sched_pct") if sale_mode == T["pct_off_label"] else 100
                     calculated_price = calculate_sale_display(base_price_val, sale_mode, discount_pct)
                     st.info(T["preview"].format(base_price_val, calculated_price))
                     
@@ -395,9 +407,8 @@ with tab1:
                     }])
                     st.session_state.df_trades = pd.concat([df_trades, new_trade], ignore_index=True)
                     save_sheet_data(st.session_state.df_trades, "trades")
-                    st.success("Success!")
                     st.rerun()
-                    
+
     st.subheader(T["active_listings"])
     if df_trades.empty or 'item' not in df_trades.columns:
         st.write(T["no_items"])
@@ -408,12 +419,10 @@ with tab1:
             
             display_price = str(row.get('price', 'Free'))
             has_any_sale_configured = pd.notna(row.get('sale_at')) and row['sale_at'] != ""
-            is_currently_discounted = False
             
             if has_any_sale_configured:
                 if now_str >= str(row['sale_at']):
                     display_price = f"🔥 SALE: {row['sale_price']} (Was {row['price']})"
-                    is_currently_discounted = True
                 else:
                     time_info = format_time_remaining(row['sale_at'])
                     display_price += f" (Drops to {row['sale_price']} in {time_info})"
@@ -431,6 +440,34 @@ with tab1:
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
+                # Live Promo Code Entry Field Box inside item card view layout
+                if not (str(row.get('is_auction')) == "True" or row.get('is_auction') is True):
+                    promo_input = st.text_input(T["use_code_input"], key=f"promo_field_{row['id']}").strip()
+                    if promo_input and not df_codes.empty:
+                        matched_code = df_codes[df_codes['code'].astype(str).str.upper() == promo_input.upper()]
+                        if not matched_code.empty:
+                            code_row = matched_code.iloc[0]
+                            creator = str(code_row['creator'])
+                            scope = str(code_row['target_ids'])
+                            discount_amt = int(code_row['discount'])
+                            
+                            is_valid_code = False
+                            if creator == "admin" and scope == "GLOBAL":
+                                is_valid_code = True
+                            elif creator == row['seller'] and scope == "GLOBAL":
+                                is_valid_code = True
+                            elif scope != "GLOBAL":
+                                parsed_ids = [id_item.strip() for id_item in scope.split(",") if id_item.strip()]
+                                if str(row['id']) in parsed_ids:
+                                    is_valid_code = True
+                                    
+                            if is_valid_code:
+                                base_num = extract_numeric_price(display_price)
+                                price_after_code = round(base_num * (1 - discount_amt / 100))
+                                st.success(f"{T['code_success']} ✨ **{price_after_code} {T['diamonds']}** ({discount_amt}% OFF)")
+                            else:
+                                st.error(T["code_invalid"])
+
                 exp_status = format_time_remaining(row.get('expires_at'))
                 st.caption(T["time_left"].format(exp_status))
             
@@ -451,7 +488,6 @@ with tab1:
                             st.rerun()
                 
                 if not is_item_auction and (is_seller or is_admin):
-                    # Manage Expiration
                     with st.expander(T["manage_exp"]):
                         mod_perm = st.checkbox(T["stay_forever"], value=("Permanent" in exp_status or pd.isna(row.get('expires_at')) or str(row.get('expires_at')) == ""), key=f"mod_perm_{row['id']}")
                         if not mod_perm:
@@ -466,7 +502,6 @@ with tab1:
                             save_sheet_data(df_trades, "trades")
                             st.rerun()
 
-                    # Trigger Sale Interface
                     if has_any_sale_configured:
                         if st.button(T["remove_sale"], key=f"rm_sale_{row['id']}"):
                             df_trades.at[idx, 'sale_price'] = ""
@@ -506,7 +541,6 @@ with tab2:
 with tab3:
     st.header(T["tabs"][2])
     st.info(f"Date: {TODAY}")
-    
     df_tps = st.session_state.df_tps
     tp_username = st.text_input("Minecraft Username", key="tp_user_input").strip().lower()
     
@@ -528,7 +562,6 @@ with tab3:
         if st.session_state.current_user == "admin":
             col_use, col_reset = st.columns(2)
             user_idx = df_tps[df_tps['username_clean'] == tp_username].index[0]
-            
             with col_use:
                 if st.button("⚡ Use 1 TP", key="btn_use_tp"):
                     if current_tps > 0:
@@ -543,6 +576,52 @@ with tab3:
                     save_sheet_data(df_tps, "tps")
                     st.rerun()
 
-# ─── TIMED BACKEND AUTO-REFRESH SCRIPT ───────────────────────────
-# Forces Streamlit backend thread to wake up and sync clock objects periodically
+# ==========================================
+# TAB 4: ADVANCED SALE CODES (SLEVOVÉ KÓDY)
+# ==========================================
+with tab4:
+    st.header(T["code_header"])
+    df_codes = st.session_state.df_codes
+    
+    if st.session_state.current_user:
+        with st.expander(T["create_code"]):
+            new_code_str = st.text_input(T["code_input"]).strip().upper()
+            code_discount = st.slider(T["code_pct"], 1, 100, 15)
+            
+            # Setup valid scopes based on whether the logged in user is admin
+            scope_options = [T["scope_global"], T["scope_specific"]]
+            if st.session_state.current_user == "admin":
+                scope_options.insert(0, T["scope_admin_global"])
+                
+            selected_scope = st.radio(T["code_scope"], scope_options)
+            
+            target_ids_val = "GLOBAL"
+            if selected_scope == T["scope_specific"]:
+                target_ids_val = st.text_input(T["specific_help"]).strip()
+                
+            if st.button(T["btn_create_code"]):
+                if new_code_str:
+                    new_code_entry = pd.DataFrame([{
+                        "code": new_code_str,
+                        "creator": st.session_state.current_user,
+                        "discount": code_discount,
+                        "target_ids": "GLOBAL" if selected_scope in [T["scope_global"], T["scope_admin_global"]] else target_ids_val
+                    }])
+                    st.session_state.df_codes = pd.concat([df_codes, new_code_entry], ignore_index=True)
+                    save_sheet_data(st.session_state.df_codes, "codes")
+                    st.success("Sale Code Created Successfully!")
+                    st.rerun()
+    else:
+        st.info("Log in to create or view sale codes.")
+        
+    st.subheader(T["active_codes"])
+    if not df_codes.empty and "code" in df_codes.columns:
+        # Format a clean lookup table for users to see active promotional codes
+        display_df = df_codes.copy()
+        display_df.columns = T["code_table_cols"]
+        st.dataframe(display_df, use_container_width=True)
+    else:
+        st.caption("No sale codes are currently active.")
+
+# Auto-refresh trigger
 st.fragment(run_every=30)(lambda: None)()
