@@ -196,6 +196,8 @@ def save_sheet_data(df, worksheet_name):
     elif worksheet_name == "tps": cols = ["username", "remaining_tps"]
     elif worksheet_name == "jail": cols = ["username", "jail_reason", "jail_until"]
     elif worksheet_name == "orders": cols = ["id", "buyer", "item", "target_qty", "current_qty", "reward_diamonds"]
+    elif worksheet_name == "sales_ledger": cols = ["timestamp", "seller", "buyer", "item", "amount", "final_price"]
+    elif worksheet_name == "pending_buys": cols = ["trade_id", "seller", "buyer", "item", "amount", "locked_price", "timestamp"]
         
     df_save = df.reindex(columns=cols).fillna("")
     payload = {"action": "clear_and_save", "sheet": worksheet_name, "data": df_save.values.tolist()}
@@ -230,6 +232,8 @@ if "df_claimed" not in st.session_state: st.session_state.df_claimed = get_sheet
 if "df_tps" not in st.session_state: st.session_state.df_tps = get_sheet_data("tps")
 if "df_jail" not in st.session_state: st.session_state.df_jail = get_sheet_data("jail")
 if "df_orders" not in st.session_state: st.session_state.df_orders = get_sheet_data("orders")
+if "df_ledger" not in st.session_state: st.session_state.df_ledger = get_sheet_data("sales_ledger")
+if "df_pending" not in st.session_state: st.session_state.df_pending = get_sheet_data("pending_buys")
 if "current_user" not in st.session_state: st.session_state.current_user = None
 
 if st.button(T["refresh_btn"], use_container_width=True):
@@ -240,6 +244,8 @@ if st.button(T["refresh_btn"], use_container_width=True):
     st.session_state.df_orders = get_sheet_data("orders")
     st.session_state.df_tps = get_sheet_data("tps")
     st.session_state.df_jail = get_sheet_data("jail")
+    st.session_state.df_ledger = get_sheet_data("sales_ledger")
+    st.session_state.df_pending = get_sheet_data("pending_buys")
     st.rerun()
 
 # Authentication UI
@@ -306,6 +312,8 @@ with tab1:
     df_trades = st.session_state.df_trades
     df_codes = st.session_state.df_codes
     df_claimed = st.session_state.df_claimed
+    df_ledger = st.session_state.df_ledger
+    df_pending = st.session_state.df_pending
     
     if st.session_state.current_user:
         # EXPANDER 1: CREATE NEW ITEMS
@@ -327,6 +335,7 @@ with tab1:
                 enchants = [e.strip() for e in text_input.split(",") if e.strip()]
             
             listing_type = st.radio(T["format"], ["Standard Fix Price", "Flash Sale / Discount", "Scheduled Sale Delay", "Auction (Bidding)"])
+            force_free_on_create = st.checkbox("🎁 Make this listing entirely FREE from the start")
             
             st.markdown(T["duration_settings"])
             is_permanent = st.checkbox(T["stay_forever"], value=False)
@@ -342,32 +351,36 @@ with tab1:
             sale_price_val = ""
             sale_at_val = ""
             
-            if listing_type == "Standard Fix Price":
-                base_price_val = st.number_input(T["base_price"], min_value=1, value=suggested_val if suggested_val > 0 else 10)
-                price_string = f"{base_price_val} Diamonds"
-            elif listing_type == "Flash Sale / Discount":
-                base_price_val = st.number_input("Original Price (Diamonds)", min_value=1, value=suggested_val if suggested_val > 0 else 10)
-                sale_price_input = st.number_input("Direct Sale Price (Diamonds)", min_value=1, value=max(1, suggested_val - 2))
-                price_string = f"🔥 SALE: {sale_price_input} Diamonds (Was {base_price_val} 💎)"
-                sale_price_val = str(sale_price_input)
+            if force_free_on_create:
+                price_string = "🎁 FREE / DAROVÁNO"
+                sale_price_val = "0"
                 sale_at_val = datetime.now().isoformat()
-            elif listing_type == "Scheduled Sale Delay":
-                base_price_val = st.number_input("Standard Starting Price (Diamonds)", min_value=1, value=suggested_val if suggested_val > 0 else 10)
-                delay_pct = st.slider("Future Discount Percentage (%)", 5, 95, 25)
-                delay_amount = st.number_input("Delay Count Duration", min_value=1, value=15)
-                delay_unit = st.selectbox("Delay Time Units", ["Minutes", "Hours", "Days"])
-                
-                # Real-Time Percentage Math Preview Box
-                calculated_markdown = round(base_price_val * (1 - delay_pct / 100))
-                st.info(f"📊 **Live Math Preview:** Price will automatically drop from {base_price_val} 💎 down to **{calculated_markdown} Diamonds** ({delay_pct}% off) when the countdown finishes.")
-                
-                price_string = f"{base_price_val} Diamonds"
-                sale_price_val = f"DELAYED_{delay_pct}_{base_price_val}"
-                sale_at_val = (datetime.now() + calculate_delta(delay_amount, delay_unit)).isoformat()
             else:
-                base_price_val = st.number_input(T["start_bid"], min_value=1, value=suggested_val if suggested_val > 0 else 5)
-                price_string = f"Starting bid: {base_price_val} Diamonds"
-                is_auction_val = True
+                if listing_type == "Standard Fix Price":
+                    base_price_val = st.number_input(T["base_price"], min_value=1, value=suggested_val if suggested_val > 0 else 10)
+                    price_string = f"{base_price_val} Diamonds"
+                elif listing_type == "Flash Sale / Discount":
+                    base_price_val = st.number_input("Original Price (Diamonds)", min_value=1, value=suggested_val if suggested_val > 0 else 10)
+                    sale_price_input = st.number_input("Direct Sale Price (Diamonds)", min_value=1, value=max(1, suggested_val - 2))
+                    price_string = f"🔥 SALE: {sale_price_input} Diamonds (Was {base_price_val} 💎)"
+                    sale_price_val = str(sale_price_input)
+                    sale_at_val = datetime.now().isoformat()
+                elif listing_type == "Scheduled Sale Delay":
+                    base_price_val = st.number_input("Standard Starting Price (Diamonds)", min_value=1, value=suggested_val if suggested_val > 0 else 10)
+                    delay_pct = st.slider("Future Discount Percentage (%)", 5, 95, 25)
+                    delay_amount = st.number_input("Delay Count Duration", min_value=1, value=15)
+                    delay_unit = st.selectbox("Delay Time Units", ["Minutes", "Hours", "Days"])
+                    
+                    calculated_markdown = round(base_price_val * (1 - delay_pct / 100))
+                    st.info(f"📊 **Live Math Preview:** Price will automatically drop from {base_price_val} 💎 down to **{calculated_markdown} Diamonds** ({delay_pct}% off) when the countdown finishes.")
+                    
+                    price_string = f"{base_price_val} Diamonds"
+                    sale_price_val = f"DELAYED_{delay_pct}_{base_price_val}"
+                    sale_at_val = (datetime.now() + calculate_delta(delay_amount, delay_unit)).isoformat()
+                else:
+                    base_price_val = st.number_input(T["start_bid"], min_value=1, value=suggested_val if suggested_val > 0 else 5)
+                    price_string = f"Starting bid: {base_price_val} Diamonds"
+                    is_auction_val = True
             
             if st.button(T["publish"]):
                 if final_item_name:
@@ -384,11 +397,52 @@ with tab1:
                     save_sheet_data(st.session_state.df_trades, "trades")
                     st.rerun()
 
-        # EXPANDER 2: MANAGEMENT PANEL (SET FREE & PERCENTAGE APPLIER)
-        if not df_trades.empty and 'seller' in df_trades.columns:
-            user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == st.session_state.current_user.lower()) & (df_trades['is_auction'] == False)]
-            if not user_items.empty:
-                with st.expander("🏷️ Shop Owner Control Panel: Modify Running Items"):
+        # EXPANDER 2: MANAGEMENT PANEL & PENDING APPROVALS
+        with st.expander("🏷️ Shop Owner Control Panel & Pending Approvals"):
+            # --- SUB-SECTION 1: DISMISSALS AND OFFERS WAITING FOR DELIVERY CONFIRMATION ---
+            st.markdown("#### ⏳ Pending Sales Awaiting Your Confirmation")
+            if df_pending is not None and not df_pending.empty:
+                my_pending = df_pending[df_pending['seller'].astype(str).str.lower() == st.session_state.current_user.lower()]
+                if my_pending.empty:
+                    st.caption("No one is waiting for delivery right now.")
+                else:
+                    for p_idx, p_row in my_pending.iterrows():
+                        st.info(f"👤 **{p_row['buyer']}** wants to buy **{p_row['item']}** ({p_row['amount']}x) for the locked price of **{p_row['locked_price']}**")
+                        c_app, c_rej = st.columns(2)
+                        with c_app:
+                            if st.button(f"✅ Accept Buy & Deliver (Locked: {p_row['locked_price']})", key=f"app_{p_idx}"):
+                                # 1. Log to Historical Ledger
+                                if df_ledger is None or df_ledger.empty:
+                                    df_ledger = pd.DataFrame(columns=["timestamp", "seller", "buyer", "item", "amount", "final_price"])
+                                record = pd.DataFrame([{
+                                    "timestamp": datetime.now().isoformat(), "seller": p_row['seller'], "buyer": p_row['buyer'],
+                                    "item": p_row['item'], "amount": int(p_row['amount']), "final_price": p_row['locked_price']
+                                }])
+                                st.session_state.df_ledger = pd.concat([df_ledger, record], ignore_index=True)
+                                save_sheet_data(st.session_state.df_ledger, "sales_ledger")
+                                
+                                # 2. Clear from pending
+                                st.session_state.df_pending = df_pending.drop(p_idx)
+                                save_sheet_data(st.session_state.df_pending, "pending_buys")
+                                st.success("Trade completed and archived!")
+                                st.rerun()
+                        with c_rej:
+                            if st.button("❌ Deny & Put Item Back Online", key=f"rej_{p_idx}"):
+                                # Put item back to active trades sheet
+                                st.session_state.df_pending = df_pending.drop(p_idx)
+                                save_sheet_data(st.session_state.df_pending, "pending_buys")
+                                st.warning("Request rejected.")
+                                st.rerun()
+            else:
+                st.caption("No pending requests.")
+                
+            st.divider()
+            
+            # --- SUB-SECTION 2: MODIFY RUNNING ITEMS ---
+            st.markdown("#### ⚙️ Edit Active Run-time Items")
+            if not df_trades.empty and 'seller' in df_trades.columns:
+                user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == st.session_state.current_user.lower()) & (df_trades['is_auction'] == False)]
+                if not user_items.empty:
                     item_options = {f"ID {r['id']} - {r['item']} ({r['amount']}x) [Current: {r['price']}]": r['id'] for _, r in user_items.iterrows()}
                     selected_target_str = st.selectbox("Choose active item:", list(item_options.keys()))
                     target_id = item_options[selected_target_str]
@@ -397,12 +451,9 @@ with tab1:
                     orig_num = extract_numeric_price(orig_price_str)
                     
                     col_pct, col_free = st.columns(2)
-                    
                     with col_pct:
                         st.markdown("##### Apply Percentage Discount")
                         instant_discount_pct = st.slider("Select Discount Percentage (%)", 5, 95, 20)
-                        
-                        # Real-Time Percentage Math Preview Box for Active items
                         if orig_num > 0:
                             preview_calc = round(orig_num * (1 - instant_discount_pct / 100))
                             st.write(f"New targeted price will be: **{preview_calc} 💎**")
@@ -416,7 +467,6 @@ with tab1:
                                 save_sheet_data(df_trades, "trades")
                                 st.success("Discount applied successfully!")
                                 st.rerun()
-                                
                     with col_free:
                         st.markdown("##### Clear Out Item Price")
                         st.write("Instantly make this active trade entirely free for any player to grab.")
@@ -501,12 +551,51 @@ with tab1:
                 elif code_success_msg == "ALREADY_USED": st.error(T["code_already_used"])
                 elif code_success_msg: st.success(code_success_msg)
             with col2:
-                if st.session_state.current_user in ["admin", row.get('seller')]:
-                    if st.button(T["remove_listing"], key=f"del_{row['id']}"):
-                        st.session_state.df_trades = df_trades.drop(idx)
-                        save_sheet_data(st.session_state.df_trades, "trades")
-                        st.rerun()
+                if st.session_state.current_user:
+                    # If it's another player's item, they can instantly trigger a "Locked Price Checkout Request"
+                    if str(row.get('seller')).lower() != st.session_state.current_user.lower():
+                        if st.button("🛒 Buy / Lock Price", key=f"buy_lock_{row['id']}", use_container_width=True):
+                            if df_pending is None:
+                                df_pending = pd.DataFrame(columns=["trade_id", "seller", "buyer", "item", "amount", "locked_price", "timestamp"])
+                            
+                            # Lock the current price state at this exact millisecond
+                            new_pending_entry = pd.DataFrame([{
+                                "trade_id": row['id'], "seller": row['seller'], "buyer": st.session_state.current_user,
+                                "item": row['item'], "amount": int(row['amount']), "locked_price": display_price,
+                                "timestamp": datetime.now().isoformat()
+                            }])
+                            st.session_state.df_pending = pd.concat([df_pending, new_pending_entry], ignore_index=True)
+                            save_sheet_data(st.session_state.df_pending, "pending_buys")
+                            
+                            # Hide from active marketplace view so no double buying occurs
+                            st.session_state.df_trades = df_trades.drop(idx)
+                            save_sheet_data(st.session_state.df_trades, "trades")
+                            st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation.")
+                            st.rerun()
+                    else:
+                        # Owner basic administrative control
+                        if st.button("🗑️ Force Cancel/Delete", key=f"del_{row['id']}", use_container_width=True):
+                            st.session_state.df_trades = df_trades.drop(idx)
+                            save_sheet_data(st.session_state.df_trades, "trades")
+                            st.rerun()
             st.divider()
+
+    # --- HISTORICAL SALES TRACKING LEDGER ---
+    st.markdown("---")
+    st.subheader("📈 Shop Sales & Purchase History Ledger" if lang == "English" else "📈 Kniha realizovaných prodejů a nákupů")
+    if df_ledger is not None and not df_ledger.empty:
+        user_lower = str(st.session_state.current_user).lower() if st.session_state.current_user else ""
+        if user_lower == "admin":
+            display_ledger_df = df_ledger
+        else:
+            display_ledger_df = df_ledger[(df_ledger['seller'].astype(str).str.lower() == user_lower) | (df_ledger['buyer'].astype(str).str.lower() == user_lower)]
+            
+        if not display_ledger_df.empty:
+            st.dataframe(display_ledger_df.sort_values(by="timestamp", ascending=False), use_container_width=True, hide_index=True)
+        else:
+            st.caption("No finalized trades recorded matching your account yet.")
+    else:
+        st.caption("The server sales logbook is currently empty.")
 
 # ==========================================
 # TAB 2: PRODUCTION ORDERS / ZAKÁZKY
