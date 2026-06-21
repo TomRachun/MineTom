@@ -17,17 +17,17 @@ PRICE_SUGGESTIONS = {
     # ⚔️ High-Tier Gear & Tools
     "Netherite Ingot": 8,
     "Diamond Block": 9,
-    "Elytra": 150,
-    "Shulker Box": 20,
-    "Beacon": 40,
-    "Totem of Undying": 30,
-    "Nether Star": 30,
+    "Elytra": 15,
+    "Shulker Box": 4,
+    "Beacon": 20,
+    "Totem of Undying": 3,
+    "Nether Star": 16,
     "Ancient Debris": 2,
-    "Mending Book": 50,
-    "Silk Touch Book": 30,
-    "Unbreaking III Book": 30,
-    "Efficiency V Book": 40,
-    "Trident": 80,
+    "Mending Book": 5,
+    "Silk Touch Book": 3,
+    "Unbreaking III Book": 3,
+    "Efficiency V Book": 4,
+    "Trident": 8,
     # 🐾 Animals & Entities
     "Horse (Tamed / High Stats)": 5,
     "Donkey / Mule": 4,
@@ -108,6 +108,9 @@ LOCALES = {
         "preview": "📊 Sale Preview: Price will drop from {} Diamonds to **{}**",
         "publish": "Publish Listing",
         "active_listings": "Active Listings",
+        "global_coupon_label": "🎟️ Apply Promo / Sale Code for Checkout",
+        "global_coupon_placeholder": "Enter code (e.g. CUSTOMERCHOICE) and press Enter",
+        "coupon_login_required": "🔒 Please log in to your account to use checkout codes.",
         "no_items": "No items on sale right now.",
         "time_left": "⏳ Time left: {}",
         "forever": "Stay Forever",
@@ -122,17 +125,17 @@ LOCALES = {
         "refresh_btn": "🔄 Force Refresh Data",
         "code_header": "🎟️ Promo & Sale Codes Manager",
         "create_code": "➕ Create New Sale Code",
-        "code_input": "Sale Code Name (e.g. SUMMER25)",
+        "code_input": "Sale Code Name (e.g. CHOOSE25)",
         "code_pct": "Discount Percentage",
         "code_scope": "Code Target Scope",
         "scope_global": "Global (All your items)",
+        "scope_choose_one": "Global (Customer chooses 1 item)",
         "scope_admin_global": "Admin Global (All marketplace items)",
         "scope_specific": "Specific Listing IDs only",
         "specific_help": "Enter comma separated IDs (e.g. 1, 4, 12)",
         "btn_create_code": "Generate Code",
         "active_codes": "Active Sale Codes",
         "code_table_cols": ["Code", "Creator", "Discount", "Scope / IDs"],
-        "use_code_input": "Enter Sale Code (Press Enter to Apply)",
         "code_success": "✅ Code Applied! Price updated.",
         "code_invalid": "❌ Code invalid for this item.",
         "code_already_used": "⚠️ You have already used this code!",
@@ -186,6 +189,9 @@ LOCALES = {
         "preview": "📊 Náhled slevy: Cena klesne z {} Diamantů na **{}**",
         "publish": "Publikovat Nabídku",
         "active_listings": "Aktivní Nabídky",
+        "global_coupon_label": "🎟️ Použít slevový / promo kód pro nákup",
+        "global_coupon_placeholder": "Zadejte kód a stiskněte Enter",
+        "coupon_login_required": "🔒 Pro uplatnění slevových kódů se musíte přihlásit.",
         "no_items": "Momentálně nejsou v nabídce žádné položky.",
         "time_left": "⏳ Zbývající čas: {}",
         "forever": "Navždy",
@@ -200,17 +206,17 @@ LOCALES = {
         "refresh_btn": "🔄 Vynutit Obnovení Dat",
         "code_header": "🎟️ Správce Slevových Kódů",
         "create_code": "➕ Vytvořit Nový Slevový Kód",
-        "code_input": "Název kódu (např. SLEVA20)",
+        "code_input": "Název kódu (např. VOLBA25)",
         "code_pct": "Výše slevy v procentech",
         "code_scope": "Rozsah Platnosti Kódu",
         "scope_global": "Globální (Všechny moje předměty)",
+        "scope_choose_one": "Globální (Zákazník si vybere 1 položku)",
         "scope_admin_global": "Admin Globální (Všechny předměty na trhu)",
         "scope_specific": "Pouze specifické ID nabídek",
         "specific_help": "Zadejte ID oddělená čárkou (např. 1, 4, 12)",
         "btn_create_code": "Generovat Kód",
         "active_codes": "Aktivní Slevové Kódy",
         "code_table_cols": ["Kód", "Tvůrce", "Sleva", "Rozsah / ID"],
-        "use_code_input": "Zadejte slevový kód (Potvrďte klávesou Enter)",
         "code_success": "✅ Kód uplatněn! Cena byla upravena.",
         "code_invalid": "❌ Neplatný slevový kód pro tuto položku.",
         "code_already_used": "⚠️ Tento kód jsi již jednou použil!",
@@ -253,7 +259,6 @@ def save_sheet_data(df, worksheet_name):
     if worksheet_name == "users":
         cols = ["username", "password"]
     elif worksheet_name == "trades":
-        # Note: 'amount' column included to handle database syncing correctly
         cols = ["id", "seller", "item", "amount", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
     elif worksheet_name == "codes":
         cols = ["code", "creator", "discount", "target_ids"]
@@ -452,7 +457,6 @@ with tab1:
                 suggested_val = PRICE_SUGGESTIONS[selected_item_key]
                 st.caption(f"{T['suggested']} **{suggested_val} {T['diamonds']}**")
             
-            # 📦 NEW QUANTITY SELECTION FIELD
             item_amount_val = st.number_input(T["item_amount"], min_value=1, value=1, step=1)
                 
             is_enchantable = st.checkbox(T["enchantable"])
@@ -529,6 +533,14 @@ with tab1:
                     st.rerun()
 
     st.subheader(T["active_listings"])
+    
+    # 🔒 AUTH PROTECTION: Only logged-in accounts can submit checkouts
+    if st.session_state.current_user:
+        global_promo_input = st.text_input(T["global_coupon_label"], placeholder=T["global_coupon_placeholder"], key="global_promo_checkout_field").strip().upper()
+    else:
+        st.warning(T["coupon_login_required"])
+        global_promo_input = ""
+
     if df_trades.empty or 'item' not in df_trades.columns:
         st.write(T["no_items"])
     else:
@@ -549,14 +561,63 @@ with tab1:
             
             if has_any_sale_configured:
                 if now_str >= str(row['sale_at']):
-                    display_price = f"🔥 SALE: {row['sale_price']} (Was {row['price']})"
+                    display_price = f"{row['sale_price']} (Was {row['price']})"
                 else:
                     time_info = format_time_remaining(row['sale_at'])
                     display_price += f" (Drops to {row['sale_price']} in {time_info})"
 
-            # Extract amount representation nicely
             raw_amt = row.get('amount')
             amt_badge = f" ({int(raw_amt)}x)" if pd.notna(raw_amt) and str(raw_amt).strip() != "" else ""
+
+            # Check if promo code applies dynamically to this specific loop item
+            code_success_msg = None
+            if global_promo_input and not df_codes.empty:
+                matched_code = df_codes[df_codes['code'].astype(str).str.upper() == global_promo_input]
+                if not matched_code.empty:
+                    code_row = matched_code.iloc[0]
+                    creator = str(code_row.get('creator', ''))
+                    scope = str(code_row.get('target_ids', 'GLOBAL'))
+                    discount_amt = int(code_row.get('discount', 0))
+                    code_name_clean = str(code_row.get('code', '')).upper()
+                    
+                    user_clean = str(st.session_state.current_user)
+                    already_used = False
+                    if not df_claimed.empty and "code" in df_claimed.columns:
+                        matched_claims = df_claimed[
+                            (df_claimed['username'].astype(str) == user_clean) & 
+                            (df_claimed['code'].astype(str).str.upper() == code_name_clean)
+                        ]
+                        if not matched_claims.empty:
+                            already_used = True
+                    
+                    if already_used:
+                        code_success_msg = "ALREADY_USED"
+                    else:
+                        is_valid_code = False
+                        # Regular complete global scopes
+                        if creator == "admin" and scope in ["GLOBAL", "CHOOSE_ONE"]:
+                            is_valid_code = True
+                        elif creator == row['seller'] and scope in ["GLOBAL", "CHOOSE_ONE"]:
+                            is_valid_code = True
+                        elif scope not in ["GLOBAL", "CHOOSE_ONE"] and scope != "":
+                            # Specific ID-only listings match
+                            parsed_ids = [id_item.strip() for id_item in scope.split(",") if id_item.strip()]
+                            if str(row['id']) in parsed_ids:
+                                is_valid_code = True
+                                
+                        if is_valid_code and discount_amt > 0:
+                            base_num = extract_numeric_price(display_price)
+                            price_after_code = round(base_num * (1 - discount_amt / 100))
+                            
+                            # DYNAMIC LIVE CLIENT INTERFACE PREVIEW OVERWRITE
+                            display_price = f"✨ {price_after_code} Diamonds ({discount_amt}% PROMO CODE OFF)"
+                            code_success_msg = f"{T['code_success']} ({discount_amt}% OFF)"
+                            
+                            if f"last_logged_{row['id']}" not in st.session_state or st.session_state[f"last_logged_{row['id']}"] != code_name_clean:
+                                new_claim = pd.DataFrame([{"username": user_clean, "code": code_name_clean}])
+                                st.session_state.df_claimed = pd.concat([df_claimed, new_claim], ignore_index=True)
+                                save_sheet_data(st.session_state.df_claimed, "claimed_codes")
+                                st.session_state[f"last_logged_{row['id']}"] = code_name_clean
 
             with col1:
                 if str(row.get('is_auction')) == "True" or row.get('is_auction') is True:
@@ -571,52 +632,10 @@ with tab1:
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                if not (str(row.get('is_auction')) == "True" or row.get('is_auction') is True):
-                    promo_input = st.text_input(T["use_code_input"], key=f"promo_field_{row['id']}").strip()
-                    if promo_input and not df_codes.empty:
-                        matched_code = df_codes[df_codes['code'].astype(str).str.upper() == promo_input.upper()]
-                        if not matched_code.empty:
-                            code_row = matched_code.iloc[0]
-                            creator = str(code_row.get('creator', ''))
-                            scope = str(code_row.get('target_ids', 'GLOBAL'))
-                            discount_amt = int(code_row.get('discount', 0))
-                            code_name_clean = str(code_row.get('code', '')).upper()
-                            
-                            user_clean = str(st.session_state.current_user)
-                            already_used = False
-                            if not df_claimed.empty and "code" in df_claimed.columns:
-                                matched_claims = df_claimed[
-                                    (df_claimed['username'].astype(str) == user_clean) & 
-                                    (df_claimed['code'].astype(str).str.upper() == code_name_clean)
-                                ]
-                                if not matched_claims.empty:
-                                    already_used = True
-                                    
-                            if already_used:
-                                st.error(T["code_already_used"])
-                            else:
-                                is_valid_code = False
-                                if creator == "admin" and scope == "GLOBAL":
-                                    is_valid_code = True
-                                elif creator == row['seller'] and scope == "GLOBAL":
-                                    is_valid_code = True
-                                elif scope != "GLOBAL" and scope != "":
-                                    parsed_ids = [id_item.strip() for id_item in scope.split(",") if id_item.strip()]
-                                    if str(row['id']) in parsed_ids:
-                                        is_valid_code = True
-                                        
-                                if is_valid_code and discount_amt > 0:
-                                    base_num = extract_numeric_price(display_price)
-                                    price_after_code = round(base_num * (1 - discount_amt / 100))
-                                    st.success(f"{T['code_success']} ✨ **{price_after_code} {T['diamonds']}** ({discount_amt}% OFF)")
-                                    
-                                    if f"last_logged_{row['id']}" not in st.session_state or st.session_state[f"last_logged_{row['id']}"] != code_name_clean:
-                                        new_claim = pd.DataFrame([{"username": user_clean, "code": code_name_clean}])
-                                        st.session_state.df_claimed = pd.concat([df_claimed, new_claim], ignore_index=True)
-                                        save_sheet_data(st.session_state.df_claimed, "claimed_codes")
-                                        st.session_state[f"last_logged_{row['id']}"] = code_name_clean
-                                else:
-                                    st.error(T["code_invalid"])
+                if code_success_msg == "ALREADY_USED":
+                    st.error(T["code_already_used"])
+                elif code_success_msg:
+                    st.success(code_success_msg)
 
                 exp_status = format_time_remaining(row.get('expires_at'))
                 st.caption(T["time_left"].format(exp_status))
@@ -740,14 +759,17 @@ with tab4:
             new_code_str = st.text_input(T["code_input"]).strip().upper()
             code_discount = st.slider(T["code_pct"], 1, 100, 15)
             
-            scope_options = [T["scope_global"], T["scope_specific"]]
+            # Added new custom targeted "CHOOSE_ONE" scope definition selection
+            scope_options = [T["scope_global"], T["scope_choose_one"], T["scope_specific"]]
             if is_admin:
                 scope_options.insert(0, T["scope_admin_global"])
                 
             selected_scope = st.radio(T["code_scope"], scope_options)
             
             target_ids_val = "GLOBAL"
-            if selected_scope == T["scope_specific"]:
+            if selected_scope == T["scope_choose_one"]:
+                target_ids_val = "CHOOSE_ONE"
+            elif selected_scope == T["scope_specific"]:
                 target_ids_val = st.text_input(T["specific_help"]).strip()
                 
             if st.button(T["btn_create_code"]):
@@ -756,7 +778,7 @@ with tab4:
                         "code": new_code_str,
                         "creator": st.session_state.current_user,
                         "discount": code_discount,
-                        "target_ids": "GLOBAL" if selected_scope in [T["scope_global"], T["scope_admin_global"]] else target_ids_val
+                        "target_ids": target_ids_val
                     }])
                     st.session_state.df_codes = pd.concat([df_codes, new_code_entry], ignore_index=True)
                     save_sheet_data(st.session_state.df_codes, "codes")
