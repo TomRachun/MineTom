@@ -170,7 +170,7 @@ LOCALES = {
 
 st.sidebar.header("🌐 Language / Jazyk")
 lang = st.sidebar.selectbox("Choose Language", ["English", "Čeština"])
-T = LOCALES[lang]
+T = locales_map = LOCALES[lang]
 
 st.title(T["title"])
 
@@ -390,7 +390,6 @@ with tab1:
                         for token in banned_tokens:
                             if token == row_id_str or token in item_name_lower: is_banned = True
 
-                    # ─── SECURE EVALUATION CHECK ───
                     if code_row.get('creator', '').strip().lower() == str(st.session_state.current_user).lower():
                         code_success_msg = "OWN_CODE_PROHIBITED"
                     elif is_banned: 
@@ -553,23 +552,19 @@ with tab4:
                 
             if st.button(T["btn_create_code"]):
                 if new_code_str:
-                    # ─── DUPLICATE DETECTION AND FORCE-EXHAUSTION MECHANISM ───
                     is_duplicate = False
                     if not df_codes.empty and "code" in df_codes.columns:
                         if new_code_str in df_codes['code'].astype(str).str.upper().values:
                             is_duplicate = True
 
                     if is_duplicate:
-                        # Find the existing code row to know its usage limit
                         existing_code = df_codes[df_codes['code'].astype(str).str.upper() == new_code_str].iloc[0]
                         max_allowed_uses = int(existing_code.get('max_uses', 1)) if pd.notna(existing_code.get('max_uses')) else 1
                         
-                        # Find out how many times this user already claimed it
                         already_claimed_count = 0
                         if not df_claimed.empty and "code" in df_claimed.columns:
                             already_claimed_count = len(df_claimed[(df_claimed['username'].astype(str) == str(st.session_state.current_user)) & (df_claimed['code'].astype(str).str.upper() == new_code_str)])
                         
-                        # Insert records to max out the remaining uses immediately
                         remaining_slots = max(0, max_allowed_uses - already_claimed_count)
                         if remaining_slots > 0:
                             bulk_claims = [{"username": st.session_state.current_user, "code": new_code_str} for _ in range(remaining_slots)]
@@ -598,19 +593,51 @@ with tab4:
                             st.rerun()
                     
         if not df_codes.empty and "code" in df_codes.columns:
+            st.subheader("📋 Your Active Promo Codes & Analytics" if lang == "English" else "📋 Vaše Slevové Kódy a Statistiky")
+            
             for c_idx, c_row in df_codes.iterrows():
+                current_code_name = str(c_row['code']).upper()
                 creator_lower = str(c_row.get('creator', '')).strip().lower()
                 viewer_lower = st.session_state.current_user.lower()
                 
                 if viewer_lower == "admin" or creator_lower == viewer_lower:
-                    col_info, col_act = st.columns([4, 1])
-                    with col_info:
-                        st.markdown(f"🎟️ **Code:** `{c_row['code']}` | **Discount:** {c_row['discount']}% | **Creator:** {c_row['creator']}")
-                        st.caption(f"Max Player Uses: {c_row.get('max_uses', 1)} | Banned Targets: {c_row.get('banned_items', 'None')}")
-                    with col_act:
-                        if viewer_lower == "admin" or creator_lower == viewer_lower:
-                            if st.button("❌ Remove Code", key=f"del_code_{c_row['code']}"):
+                    # Gather claims information for this code
+                    code_claims_df = pd.DataFrame()
+                    claims_count = 0
+                    if not df_claimed.empty and "code" in df_claimed.columns:
+                        code_claims_df = df_claimed[df_claimed['code'].astype(str).str.upper() == current_code_name]
+                        claims_count = len(code_claims_df)
+                    
+                    with st.container():
+                        col_info, col_act = st.columns([4, 2])
+                        with col_info:
+                            st.markdown(f"🎟️ **Code:** `{current_code_name}` | **Discount:** {c_row['discount']}%")
+                            st.caption(f"Created by: {c_row['creator']} | Max Uses Per Player: {c_row.get('max_uses', 1)}")
+                            st.markdown(f"📈 **Total Claims recorded:** `{claims_count}`")
+                        
+                        with col_act:
+                            if st.button("❌ Terminate Code", key=f"del_code_{current_code_name}", use_container_width=True):
                                 st.session_state.df_codes = df_codes.drop(c_idx)
                                 save_sheet_data(st.session_state.df_codes, "codes")
                                 st.rerun()
-                    st.divider()
+                                
+                            if claims_count > 0:
+                                if st.button("♻️ Wipe Total Usage", key=f"wipe_all_{current_code_name}", use_container_width=True):
+                                    st.session_state.df_claimed = df_claimed[df_claimed['code'].astype(str).str.upper() != current_code_name]
+                                    save_sheet_data(st.session_state.df_claimed, "claimed_codes")
+                                    st.rerun()
+                        
+                        # Sub-expander for granular tracking inside this promo code item
+                        if claims_count > 0:
+                            with st.expander(f"🔍 View Users / Delete Specific Usage ({claims_count})"):
+                                for claim_idx, claim_row in code_claims_df.iterrows():
+                                    claim_user = claim_row['username']
+                                    c_user_col, c_btn_col = st.columns([4, 2])
+                                    with c_user_col:
+                                        st.text(f"👤 Player: {claim_user}")
+                                    with c_btn_col:
+                                        if st.button("Delete Entry", key=f"rem_entry_{current_code_name}_{claim_user}_{claim_idx}"):
+                                            st.session_state.df_claimed = df_claimed.drop(claim_idx)
+                                            save_sheet_data(st.session_state.df_claimed, "claimed_codes")
+                                            st.rerun()
+                        st.divider()
