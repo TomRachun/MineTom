@@ -17,9 +17,10 @@ except Exception as e:
     st.error("Missing configuration. Please check your public_gsheets_url in Streamlit Secrets.")
     st.stop()
 
+
 # Helper function to easily read worksheets as DataFrames
 def get_sheet_data(worksheet_name):
-    return conn.read(spreadsheet=st.secrets["public_gsheets_url"], worksheet=worksheet_name=worksheet_name, ttl=0)
+    return conn.read(spreadsheet=st.secrets["public_gsheets_url"], worksheet=worksheet_name, ttl=0)
 
 # Helper function to save DataFrames back to the cloud
 def save_sheet_data(df, worksheet_name):
