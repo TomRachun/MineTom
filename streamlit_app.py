@@ -8,59 +8,60 @@ import time
 if "last_refresh" not in st.session_state:
     st.session_state.last_refresh = time.time()
 
-# ─── CONFIGURATION & DATA (EXPANDED & REORDERED) ─────────────────
+# ─── CONFIGURATION & DATA (MAPPED TO: (PRICE, SUGGESTED_AMOUNT)) ───
 MAX_TPS = 3
 TODAY = str(date.today())
 
 PRICE_SUGGESTIONS = {
-    "Custom Item / Jiný předmět": 0,
+    "Custom Item / Jiný předmět": (0, 1),
     # ⚔️ High-Tier Gear & Tools
-    "Netherite Ingot": 8,
-    "Diamond Block": 9,
-    "Elytra": 15,
-    "Shulker Box": 4,
-    "Beacon": 20,
-    "Totem of Undying": 3,
-    "Nether Star": 16,
-    "Ancient Debris": 2,
-    "Mending Book": 5,
-    "Silk Touch Book": 3,
-    "Unbreaking III Book": 3,
-    "Efficiency V Book": 4,
-    "Trident": 8,
+    "Netherite Ingot": (8, 1),
+    "Diamond Block": (9, 1),
+    "Elytra": (150, 1),
+    "Shulker Box": (20, 1),
+    "Beacon": (40, 1),
+    "Totem of Undying": (30, 1),
+    "Nether Star": (30, 1),
+    "Ancient Debris": (2, 1),
+    "Mending Book": (50, 1),
+    "Silk Touch Book": (30, 1),
+    "Unbreaking III Book": (30, 1),
+    "Efficiency V Book": (40, 1),
+    "Trident": (80, 1),
     # 🐾 Animals & Entities
-    "Horse (Tamed / High Stats)": 5,
-    "Donkey / Mule": 4,
-    "Villager (Unemployed)": 6,
-    "Mending Villager": 25,
-    "Armorer Villager (Master)": 15,
-    "Wolf / Dog": 2,
-    "Cat": 2,
-    "Axolotl (Blue Rare)": 10,
-    "Axolotl (Standard)": 2,
-    "Bee Nest (With 3 Bees)": 4,
-    "Frog / Toad": 2,
-    "Camel": 6,
-    "Sniffer Egg": 8,
+    "Horse (Tamed / High Stats)": (5, 1),
+    "Donkey / Mule": (4, 1),
+    "Villager (Unemployed)": (6, 1),
+    "Mending Villager": (25, 1),
+    "Armorer Villager (Master)": (15, 1),
+    "Wolf / Dog": (2, 1),
+    "Cat": (2, 1),
+    "Axolotl (Blue Rare)": (10, 1),
+    "Axolotl (Standard)": (2, 1),
+    "Bee Nest (With 3 Bees)": (4, 1),
+    "Frog / Toad": (2, 1),
+    "Camel": (6, 1),
+    "Sniffer Egg": (8, 1),
     # 💎 Blocks & Valuables
-    "Enchanted Golden Apple": 10,
-    "Golden Apple": 1,
-    "Block of Netherite": 72,
-    "Emerald Block": 2,
-    "Gold Block": 3,
-    "Iron Block": 1,
-    "Sea Lantern (Stack)": 4,
-    "Glowstone (Stack)": 2,
-    "Crying Obsidian (Stack)": 3,
+    "Enchanted Golden Apple": (10, 1),
+    "Golden Apple": (1, 1),
+    "Block of Netherite": (72, 1),
+    "Emerald Block": (2, 1),
+    "Gold Block": (3, 1),
+    "Iron Block": (1, 1),
+    "Sea Lantern (Stack)": (4, 64),
+    "Glowstone (Stack)": (2, 64),
+    "Rocket's x16": (1, 16),
+    "Crying Obsidian (Stack)": (3, 64),
     # 🧪 Brewing & Mob Drops
-    "Wither Skeleton Skull": 5,
-    "Sponge Block": 2,
-    "Blaze Rod (Stack)": 3,
-    "Ender Pearl (Stack)": 2,
-    "Gunpowder (Stack)": 3,
-    "Phantom Membrane": 1,
-    "Slimeball (Stack)": 2,
-    "Dragon's Breath": 2
+    "Wither Skeleton Skull": (5, 3),
+    "Sponge Block": (2, 1),
+    "Blaze Rod (Stack)": (3, 64),
+    "Ender Pearl (Stack)": (2, 16),
+    "Gunpowder (Stack)": (3, 64),
+    "Phantom Membrane": (1, 1),
+    "Slimeball (Stack)": (2, 64),
+    "Dragon's Breath": (2, 1)
 }
 
 # ─── TRANSLATION DICTIONARY ──────────────────────────────────────
@@ -87,7 +88,7 @@ LOCALES = {
         "item_name": "Item Selection (Type to Search)",
         "custom_item": "Enter Custom Item Name",
         "item_amount": "Amount / Quantity",
-        "suggested": "💡 Suggested Price:",
+        "suggested": "💡 Suggested:",
         "diamonds": "Diamonds",
         "enchantable": "Enchantable?",
         "enchants_placeholder": "Enchants (comma separated)",
@@ -170,7 +171,7 @@ LOCALES = {
         "item_name": "Výběr Předmětu (Pište pro hledání)",
         "custom_item": "Zadejte vlastní název předmětu",
         "item_amount": "Množství / Počet",
-        "suggested": "💡 Doporučená cena:",
+        "suggested": "💡 Doporučeno:",
         "diamonds": "Diamantů",
         "enchantable": "Očarovatelný (Enchanty)?",
         "enchants_placeholder": "Enchanty (oddělené čárkou)",
@@ -423,15 +424,17 @@ with tab1:
                 help="Type to search available item catalog configurations"
             )
             
-            if selected_item_key == "Custom Item / Jiný předmět":
+            # Extract configurations out of the tuple matrix
+            suggested_val, suggested_amount = PRICE_SUGGESTIONS[selected_item_key]
+            
+            if selected_item_key == "Custom Item / Jiný Corporate":
                 final_item_name = st.text_input(T["custom_item"], placeholder="e.g. Diamond Sword with Fire Aspect").strip()
-                suggested_val = 0
             else:
                 final_item_name = selected_item_key
-                suggested_val = PRICE_SUGGESTIONS[selected_item_key]
-                st.caption(f"{T['suggested']} **{suggested_val} {T['diamonds']}**")
+                st.caption(f"{T['suggested']} **{suggested_val} {T['diamonds']}** | Qty: **{suggested_amount}x**")
             
-            item_amount_val = st.number_input(T["item_amount"], min_value=1, value=1, step=1)
+            # Using the matrix suggested count as dynamic layout values
+            item_amount_val = st.number_input(T["item_amount"], min_value=1, value=suggested_amount, step=1)
             is_enchantable = st.checkbox(T["enchantable"])
             enchants = []
             if is_enchantable:
@@ -554,7 +557,6 @@ with tab1:
                     code_name_clean = str(code_row.get('code', '')).upper()
                     banned_items_str = str(code_row.get('banned_items', ''))
                     
-                    # Owner Anti-Overpowered Blacklist check
                     if banned_items_str.strip():
                         banned_keywords = [k.strip().lower() for k in banned_items_str.split(",") if k.strip()]
                         for keyword in banned_keywords:
@@ -655,7 +657,6 @@ with tab2:
             st.markdown(f"### 📦 Order #{o_row['id']}: Delivery for `{o_row['buyer']}`")
             st.markdown(f"**Item Needed:** {o_row['item']} | **Reward:** {o_row['reward_diamonds']} Diamonds")
             
-            # Progress fulfillment computations
             curr = int(o_row['current_qty'])
             target = int(o_row['target_qty'])
             remaining = max(0, target - curr)
@@ -664,7 +665,6 @@ with tab2:
             st.progress(progress_pct)
             st.markdown(f"📊 **Fulfillment Status:** Brought `{curr}` / `{target}` total units (**{remaining} units remaining**)")
             
-            # Management lines for Order Owners / Buyers
             if st.session_state.current_user == o_row['buyer'] or st.session_state.current_user == "admin":
                 col_add, col_sub, col_del = st.columns([2, 2, 2])
                 with col_add:
@@ -685,7 +685,7 @@ with tab2:
                     st.write("")
                     if st.button("❌ Close Order", key=f"close_order_{o_row['id']}", use_container_width=True):
                         st.session_state.df_orders = df_orders.drop(o_idx)
-                        save_sheet_data(st.session_state.df_orders, "orders")
+                        save_sheet_data(df_orders, "orders")
                         st.rerun()
             st.divider()
 
@@ -739,7 +739,6 @@ with tab4:
             elif selected_scope == T["scope_specific"]:
                 target_ids_val = st.text_input(T["specific_help"]).strip()
                 
-            # Blacklist input configuration to prevent overpowered coupon uses
             banned_items_input = st.text_input(T["code_banned_expl"], placeholder="e.g. Elytra, Netherite Ingot, Beacon")
                 
             if st.button(T["btn_create_code"]):
