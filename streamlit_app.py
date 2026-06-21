@@ -115,7 +115,18 @@ if "current_user" not in st.session_state:
 df_trades_current = st.session_state.df_trades
 if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
     now_str = datetime.now().isoformat()
-    valid_trades = df_trades_current[(df_trades_current["expires_at"].isna()) | (df_trades_current["expires_at"] == "") | (df_trades_current["expires_at"] > now_str)]
+    
+    # 📢 FIXED: Safely convert the column to string type so comparisons never crash
+    expires_str_series = df_trades_current["expires_at"].astype(str).str.strip()
+    
+    # Keep rows where expiration is missing, empty, or still in the future
+    valid_trades = df_trades_current[
+        (df_trades_current["expires_at"].isna()) | 
+        (expires_str_series == "") | 
+        (expires_str_series == "nan") | 
+        (expires_str_series > now_str)
+    ]
+    
     if len(valid_trades) != len(df_trades_current):
         st.session_state.df_trades = valid_trades
         save_sheet_data(valid_trades, "trades")
