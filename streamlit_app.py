@@ -233,34 +233,37 @@ with tab3:
     st.header("Daily Teleport (TP) Tracker")
     st.info(f"Today's Date Reference: **{TODAY}** (Resets daily)")
     
-    tp_username = st.text_input("Enter Minecraft Username to track/use").strip().lower()
+    # Using 'key' binds this input directly to st.session_state.tp_user_input
+    tp_username = st.text_input("Enter Minecraft Username to track/use", key="tp_user_input").strip().lower()
     
     if tp_username:
-        if tp_username not in tps_data["users"]:
-            tps_data["users"][tp_username] = MAX_TPS
-            save_tps_data(tps_data)
+        # Load up-to-date data directly from state reference
+        if tp_username not in st.session_state.tps_data["users"]:
+            st.session_state.tps_data["users"][tp_username] = MAX_TPS
+            save_tps_data(st.session_state.tps_data)
             
-        current_tps = tps_data["users"][tp_username]
+        current_tps = st.session_state.tps_data["users"][tp_username]
         st.metric(label=f"Remaining TPs for {tp_username}", value=f"{current_tps} / {MAX_TPS}")
         
         # Only admins can view action buttons and interact
         if st.session_state.current_user == "admin":
             col_use, col_reset = st.columns(2)
             with col_use:
-                if st.button("⚡ Use 1 Teleport"):
+                # Unique key ensures the button state registers perfectly
+                if st.button("⚡ Use 1 Teleport", key="btn_use_tp"):
                     if current_tps <= 0:
                         st.error(f"💀 {tp_username} has NO TPs left today!")
                     else:
-                        tps_data["users"][tp_username] -= 1
-                        save_tps_data(tps_data)
-                        st.success(f"Teleport tracked! Remainder saved.")
+                        st.session_state.tps_data["users"][tp_username] -= 1
+                        save_tps_data(st.session_state.tps_data)
+                        st.success(f"Teleport tracked for {tp_username}!")
                         st.rerun()
                         
             with col_reset:
-                if st.button("🔄 Admin Reset to Full"):
-                    tps_data["users"][tp_username] = MAX_TPS
-                    save_tps_data(tps_data)
-                    st.success("Reset completed!")
+                if st.button("🔄 Admin Reset to Full", key="btn_reset_tp"):
+                    st.session_state.tps_data["users"][tp_username] = MAX_TPS
+                    save_tps_data(st.session_state.tps_data)
+                    st.success(f"Reset completed for {tp_username}!")
                     st.rerun()
         else:
             st.warning("⚠️ Only the admin account can adjust or log teleport usages.")
