@@ -137,7 +137,7 @@ LOCALES = {
         "fixed_price": "Standardní Pevná Cena",
         "auction_format": "Aukce (Přihazování)",
         "duration_settings": "##### Nastavení Doby Trvání",
-        "stay_forever": "Zůstat navždy (Bez časovače expirace)",
+        "stay_forever": "Zůstanu navždy (Bez časovače expirace)",
         "time_amount": "Množství času",
         "time_unit": "Časová jednotka",
         "base_price": "Základní Cena (Diamanty)",
@@ -390,7 +390,7 @@ with tab1:
                         for token in banned_tokens:
                             if token == row_id_str or token in item_name_lower: is_banned = True
 
-                    # ─── SELF-USAGE EXCLUSION LOGIC ───
+                    # ─── SECURE EVALUATION CHECK ───
                     if code_row.get('creator', '').strip().lower() == str(st.session_state.current_user).lower():
                         code_success_msg = "OWN_CODE_PROHIBITED"
                     elif is_banned: 
@@ -406,7 +406,7 @@ with tab1:
                 st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({row['amount']}x)**")
                 st.markdown(f"Price: **{display_price}**")
                 if code_success_msg == "OWN_CODE_PROHIBITED": 
-                    st.warning("⚠️ You cannot use this code and it will be further invalid for you to prevent using it by yourself after seeing this message.")
+                    st.warning("⚠️ Access Denied: You cannot use promo codes you created. This code has been rendered invalid for your account.")
                 elif code_success_msg == "BLOCKED_BLACKLIST": st.error(T["code_blocked_msg"])
                 elif code_success_msg == "ALREADY_USED": st.error(T["code_already_used"])
                 elif code_success_msg: st.success(code_success_msg)
@@ -536,6 +536,7 @@ with tab4:
     st.header(T["code_header"])
     df_codes = st.session_state.df_codes
     df_trades = st.session_state.df_trades
+    df_claimed = st.session_state.df_claimed
     
     if st.session_state.current_user:
         with st.expander(T["create_code"]):
@@ -552,23 +553,49 @@ with tab4:
                 
             if st.button(T["btn_create_code"]):
                 if new_code_str:
-                    passed_ownership_check = True
-                    banned_tokens = [t.strip() for t in banned_items_input.split(",") if t.strip()]
-                    for token in banned_tokens:
-                        if token.isdigit():
-                            matched_listing = df_trades[df_trades['id'].astype(float) == float(token)]
-                            if not matched_listing.empty:
-                                listing_owner = str(matched_listing.iloc[0].get('seller', '')).strip().lower()
-                                if listing_owner != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
-                                    passed_ownership_check = False
-                    
-                    if not passed_ownership_check:
-                        st.error(T["not_owned_err"])
+                    # ─── DUPLICATE DETECTION AND FORCE-EXHAUSTION MECHANISM ───
+                    is_duplicate = False
+                    if not df_codes.empty and "code" in df_codes.columns:
+                        if new_code_str in df_codes['code'].astype(str).str.upper().values:
+                            is_duplicate = True
+
+                    if is_duplicate:
+                        # Find the existing code row to know its usage limit
+                        existing_code = df_codes[df_codes['code'].astype(str).str.upper() == new_code_str].iloc[0]
+                        max_allowed_uses = int(existing_code.get('max_uses', 1)) if pd.notna(existing_code.get('max_uses')) else 1
+                        
+                        # Find out how many times this user already claimed it
+                        already_claimed_count = 0
+                        if not df_claimed.empty and "code" in df_claimed.columns:
+                            already_claimed_count = len(df_claimed[(df_claimed['username'].astype(str) == str(st.session_state.current_user)) & (df_claimed['code'].astype(str).str.upper() == new_code_str)])
+                        
+                        # Insert records to max out the remaining uses immediately
+                        remaining_slots = max(0, max_allowed_uses - already_claimed_count)
+                        if remaining_slots > 0:
+                            bulk_claims = [{"username": st.session_state.current_user, "code": new_code_str} for _ in range(remaining_slots)]
+                            df_claims_new = pd.DataFrame(bulk_claims)
+                            st.session_state.df_claimed = pd.concat([df_claimed, df_claims_new], ignore_index=True)
+                            save_sheet_data(st.session_state.df_claimed, "claimed_codes")
+                        
+                        st.error(f"❌ Duplicate generation blocked! Code `{new_code_str}` already exists. All available uses have been consumed for your account and it is now permanently invalid for you.")
                     else:
-                        new_entry = pd.DataFrame([{"code": new_code_str, "creator": st.session_state.current_user, "discount": code_discount, "target_ids": target_ids_val, "banned_items": banned_items_input.strip(), "max_uses": usage_limit}])
-                        st.session_state.df_codes = pd.concat([df_codes, new_entry], ignore_index=True)
-                        save_sheet_data(st.session_state.df_codes, "codes")
-                        st.rerun()
+                        passed_ownership_check = True
+                        banned_tokens = [t.strip() for t in banned_items_input.split(",") if t.strip()]
+                        for token in banned_tokens:
+                            if token.isdigit():
+                                matched_listing = df_trades[df_trades['id'].astype(float) == float(token)]
+                                if not matched_listing.empty:
+                                    listing_owner = str(matched_listing.iloc[0].get('seller', '')).strip().lower()
+                                    if listing_owner != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
+                                        passed_ownership_check = False
+                        
+                        if not passed_ownership_check:
+                            st.error(T["not_owned_err"])
+                        else:
+                            new_entry = pd.DataFrame([{"code": new_code_str, "creator": st.session_state.current_user, "discount": code_discount, "target_ids": target_ids_val, "banned_items": banned_items_input.strip(), "max_uses": usage_limit}])
+                            st.session_state.df_codes = pd.concat([df_codes, new_entry], ignore_index=True)
+                            save_sheet_data(st.session_state.df_codes, "codes")
+                            st.rerun()
                     
         if not df_codes.empty and "code" in df_codes.columns:
             for c_idx, c_row in df_codes.iterrows():
