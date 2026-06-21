@@ -588,7 +588,6 @@ with tab4:
             new_code_str = st.text_input(T["code_input"]).strip().upper()
             code_discount = st.slider(T["code_pct"], 1, 100, 15)
             
-            # Setup valid scopes based on whether the logged in user is admin
             scope_options = [T["scope_global"], T["scope_specific"]]
             if st.session_state.current_user == "admin":
                 scope_options.insert(0, T["scope_admin_global"])
@@ -611,17 +610,24 @@ with tab4:
                     save_sheet_data(st.session_state.df_codes, "codes")
                     st.success("Sale Code Created Successfully!")
                     st.rerun()
+                    
+        # 🔒 HIDDEN/PRIVATE DASHBOARD FOR CREATORS & ADMINS ONLY
+        st.subheader(T["active_codes"])
+        if not df_codes.empty and "code" in df_codes.columns:
+            # Filter the table down: Show code only if logged in user is admin OR they created it
+            is_admin = st.session_state.current_user == "admin"
+            private_df = df_codes[is_admin | (df_codes['creator'].astype(str) == st.session_state.current_user)]
+            
+            if not private_df.empty:
+                display_df = private_df.reindex(columns=["code", "creator", "discount", "target_ids"]).fillna("")
+                display_df.columns = T["code_table_cols"]
+                st.dataframe(display_df, use_container_width=True)
+            else:
+                st.caption("You haven't created any secrets or codes yet! You can make one above." if lang == "English" else "Zatím jste nevytvořili žádné tajné kódy! Můžete je vytvořit výše.")
+        else:
+            st.caption("No sale codes are currently active.")
+            
     else:
         st.info("Log in to create or view sale codes.")
-        
-    st.subheader(T["active_codes"])
-    if not df_codes.empty and "code" in df_codes.columns:
-        # Format a clean lookup table for users to see active promotional codes
-        display_df = df_codes.copy()
-        display_df.columns = T["code_table_cols"]
-        st.dataframe(display_df, use_container_width=True)
-    else:
-        st.caption("No sale codes are currently active.")
-
 # Auto-refresh trigger
 st.fragment(run_every=30)(lambda: None)()
