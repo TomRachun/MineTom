@@ -399,7 +399,6 @@ with tab1:
 
         # EXPANDER 2: MANAGEMENT PANEL & PENDING APPROVALS
         with st.expander("🏷️ Shop Owner Control Panel & Pending Approvals"):
-            # --- SUB-SECTION 1: DISMISSALS AND OFFERS WAITING FOR DELIVERY CONFIRMATION ---
             st.markdown("#### ⏳ Pending Sales Awaiting Your Confirmation")
             if df_pending is not None and not df_pending.empty:
                 my_pending = df_pending[df_pending['seller'].astype(str).str.lower() == st.session_state.current_user.lower()]
@@ -407,11 +406,10 @@ with tab1:
                     st.caption("No one is waiting for delivery right now.")
                 else:
                     for p_idx, p_row in my_pending.iterrows():
-                        st.info(f"👤 **{p_row['buyer']}** wants to buy **{p_row['item']}** ({p_row['amount']}x) for the locked price of **{p_row['locked_price']}**")
+                        st.info(f"👤 **{p_row['buyer']}** wants to buy **{p_row['amount']}x** of **{p_row['item']}** for the locked price of **{p_row['locked_price']}**")
                         c_app, c_rej = st.columns(2)
                         with c_app:
-                            if st.button(f"✅ Accept Buy & Deliver (Locked: {p_row['locked_price']})", key=f"app_{p_idx}"):
-                                # 1. Log to Historical Ledger
+                            if st.button(f"✅ Confirm Delivery & Payment", key=f"app_{p_idx}"):
                                 if df_ledger is None or df_ledger.empty:
                                     df_ledger = pd.DataFrame(columns=["timestamp", "seller", "buyer", "item", "amount", "final_price"])
                                 record = pd.DataFrame([{
@@ -421,24 +419,26 @@ with tab1:
                                 st.session_state.df_ledger = pd.concat([df_ledger, record], ignore_index=True)
                                 save_sheet_data(st.session_state.df_ledger, "sales_ledger")
                                 
-                                # 2. Clear from pending
                                 st.session_state.df_pending = df_pending.drop(p_idx)
                                 save_sheet_data(st.session_state.df_pending, "pending_buys")
                                 st.success("Trade completed and archived!")
                                 st.rerun()
                         with c_rej:
-                            if st.button("❌ Deny & Put Item Back Online", key=f"rej_{p_idx}"):
-                                # Put item back to active trades sheet
+                            if st.button("❌ Deny Request & Return to Stock", key=f"rej_{p_idx}"):
+                                # Return stock back to the listing if it still exists
+                                orig_trade_id = p_row['trade_id']
+                                if orig_trade_id in df_trades['id'].values:
+                                    df_trades.loc[df_trades['id'] == orig_trade_id, 'amount'] += int(p_row['amount'])
+                                    save_sheet_data(df_trades, "trades")
                                 st.session_state.df_pending = df_pending.drop(p_idx)
                                 save_sheet_data(st.session_state.df_pending, "pending_buys")
-                                st.warning("Request rejected.")
+                                st.warning("Request rejected and stock restored.")
                                 st.rerun()
             else:
                 st.caption("No pending requests.")
                 
             st.divider()
             
-            # --- SUB-SECTION 2: MODIFY RUNNING ITEMS ---
             st.markdown("#### ⚙️ Edit Active Run-time Items")
             if not df_trades.empty and 'seller' in df_trades.columns:
                 user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == st.session_state.current_user.lower()) & (df_trades['is_auction'] == False)]
@@ -489,7 +489,11 @@ with tab1:
             display_price = str(row.get('price', 'Free'))
             item_name_lower = str(row.get('item', '')).lower()
             row_id_str = str(row.get('id', '')).strip()
+            max_stock = int(row.get('amount', 1))
             
+            if max_stock <= 0:
+                continue
+
             # --- EVALUATE SCHEDULED AUTOMATIC SALES IN REAL-TIME ---
             sale_price_field = str(row.get('sale_price', ''))
             sale_at_field = str(row.get('sale_at', ''))
@@ -539,41 +543,48 @@ with tab1:
                         code_success_msg = f"{T['code_success']}"
 
             with col1:
-                st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({row['amount']}x)**")
+                st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({max_stock}x available)**")
                 st.markdown(f"Price: **{display_price}**")
                 
                 if "DELAYED_" in sale_price_field and datetime.now() < datetime.fromisoformat(sale_at_field):
                     st.info(f"⏳ Scheduled Markdown starting in: {format_time_remaining(sale_at_field)}")
                     
                 if code_success_msg == "OWN_CODE_PROHIBITED": 
-                    st.warning("⚠️ Access Denied: You cannot use promo codes you created. This code has been rendered invalid for your account.")
+                    st.warning("⚠️ Access Denied: You cannot use promo codes you created.")
                 elif code_success_msg == "BLOCKED_BLACKLIST": st.error(T["code_blocked_msg"])
                 elif code_success_msg == "ALREADY_USED": st.error(T["code_already_used"])
                 elif code_success_msg: st.success(code_success_msg)
             with col2:
                 if st.session_state.current_user:
-                    # If it's another player's item, they can instantly trigger a "Locked Price Checkout Request"
                     if str(row.get('seller')).lower() != st.session_state.current_user.lower():
-                        if st.button("🛒 Buy / Lock Price", key=f"buy_lock_{row['id']}", use_container_width=True):
+                        # --- QUANTITY SELECTOR FOR MULTIPLE PURCHASES ---
+                        buy_qty = st.number_input(f"Quantity to buy (ID {row['id']})", min_value=1, max_value=max_stock, value=1, key=f"qty_{row['id']}")
+                        
+                        if st.button("🛒 Request Buy / Lock Price", key=f"buy_lock_{row['id']}", use_container_width=True):
                             if df_pending is None:
                                 df_pending = pd.DataFrame(columns=["trade_id", "seller", "buyer", "item", "amount", "locked_price", "timestamp"])
                             
-                            # Lock the current price state at this exact millisecond
+                            # Lock down the purchase intent with specific quantity chosen
                             new_pending_entry = pd.DataFrame([{
                                 "trade_id": row['id'], "seller": row['seller'], "buyer": st.session_state.current_user,
-                                "item": row['item'], "amount": int(row['amount']), "locked_price": display_price,
+                                "item": row['item'], "amount": int(buy_qty), "locked_price": f"{display_price} (x{buy_qty})",
                                 "timestamp": datetime.now().isoformat()
                             }])
                             st.session_state.df_pending = pd.concat([df_pending, new_pending_entry], ignore_index=True)
                             save_sheet_data(st.session_state.df_pending, "pending_buys")
                             
-                            # Hide from active marketplace view so no double buying occurs
-                            st.session_state.df_trades = df_trades.drop(idx)
+                            # Deduct stock instead of removing entirely unless stock hits zero
+                            remaining_stock = max_stock - buy_qty
+                            if remaining_stock <= 0:
+                                st.session_state.df_trades = df_trades.drop(idx)
+                            else:
+                                df_trades.at[idx, 'amount'] = remaining_stock
+                                st.session_state.df_trades = df_trades
+                                
                             save_sheet_data(st.session_state.df_trades, "trades")
-                            st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation.")
+                            st.success(f"Locked in {buy_qty}x at {display_price}! Waiting for owner confirmation.")
                             st.rerun()
                     else:
-                        # Owner basic administrative control
                         if st.button("🗑️ Force Cancel/Delete", key=f"del_{row['id']}", use_container_width=True):
                             st.session_state.df_trades = df_trades.drop(idx)
                             save_sheet_data(st.session_state.df_trades, "trades")
@@ -752,7 +763,7 @@ with tab4:
                             st.session_state.df_claimed = pd.concat([df_claimed, df_claims_new], ignore_index=True)
                             save_sheet_data(st.session_state.df_claimed, "claimed_codes")
                         
-                        st.error(f"❌ Duplicate generation blocked! Code `{new_code_str}` already exists. All available uses have been consumed for your account and it is now permanently invalid for you.")
+                        st.error(f"❌ Duplicate generation blocked!")
                     else:
                         passed_ownership_check = True
                         banned_tokens = [t.strip() for t in banned_items_input.split(",") if t.strip()]
