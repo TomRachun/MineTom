@@ -8,22 +8,59 @@ import time
 if "last_refresh" not in st.session_state:
     st.session_state.last_refresh = time.time()
 
-# ─── CONFIGURATION & DATA ────────────────────────────────────────
+# ─── CONFIGURATION & DATA (EXPANDED & REORDERED) ─────────────────
 MAX_TPS = 3
 TODAY = str(date.today())
 
 PRICE_SUGGESTIONS = {
+    "Custom Item / Jiný předmět": 0,
+    # ⚔️ High-Tier Gear & Tools
     "Netherite Ingot": 8,
     "Diamond Block": 9,
-    "Elytra": 15,
-    "Shulker Box": 4,
-    "Enchanted Golden Apple": 10,
-    "Beacon": 20,
-    "Totem of Undying": 3,
-    "Nether Star": 16,
+    "Elytra": 150,
+    "Shulker Box": 20,
+    "Beacon": 40,
+    "Totem of Undying": 30,
+    "Nether Star": 30,
     "Ancient Debris": 2,
-    "Mending Book": 5,
-    "Custom Item / Jiný předmět": 0
+    "Mending Book": 50,
+    "Silk Touch Book": 30,
+    "Unbreaking III Book": 30,
+    "Efficiency V Book": 40,
+    "Trident": 80,
+    # 🐾 Animals & Entities
+    "Horse (Tamed / High Stats)": 5,
+    "Donkey / Mule": 4,
+    "Villager (Unemployed)": 6,
+    "Mending Villager": 25,
+    "Armorer Villager (Master)": 15,
+    "Wolf / Dog": 2,
+    "Cat": 2,
+    "Axolotl (Blue Rare)": 10,
+    "Axolotl (Standard)": 2,
+    "Bee Nest (With 3 Bees)": 4,
+    "Frog / Toad": 2,
+    "Camel": 6,
+    "Sniffer Egg": 8,
+    # 💎 Blocks & Valuables
+    "Enchanted Golden Apple": 10,
+    "Golden Apple": 1,
+    "Block of Netherite": 72,
+    "Emerald Block": 2,
+    "Gold Block": 3,
+    "Iron Block": 1,
+    "Sea Lantern (Stack)": 4,
+    "Glowstone (Stack)": 2,
+    "Crying Obsidian (Stack)": 3,
+    # 🧪 Brewing & Mob Drops
+    "Wither Skeleton Skull": 5,
+    "Sponge Block": 2,
+    "Blaze Rod (Stack)": 3,
+    "Ender Pearl (Stack)": 2,
+    "Gunpowder (Stack)": 3,
+    "Phantom Membrane": 1,
+    "Slimeball (Stack)": 2,
+    "Dragon's Breath": 2
 }
 
 # ─── TRANSLATION DICTIONARY ──────────────────────────────────────
@@ -40,7 +77,7 @@ LOCALES = {
         "tabs": ["🛒 Trade Store", "📜 Case Records", "⚡ Teleport Tracker", "🎟️ Sale Codes"],
         "marketplace": "Server Marketplace",
         "create_listing": "➕ Create Listing (Sale / Sale Delay / Auction)",
-        "item_name": "Item Selection",
+        "item_name": "Item Selection (Type to Search)",
         "custom_item": "Enter Custom Item Name",
         "suggested": "💡 Suggested Price:",
         "diamonds": "Diamonds",
@@ -87,7 +124,7 @@ LOCALES = {
         "btn_create_code": "Generate Code",
         "active_codes": "Active Sale Codes",
         "code_table_cols": ["Code", "Creator", "Discount", "Scope / IDs"],
-        "use_code_input": "Enter Sale Code",
+        "use_code_input": "Enter Sale Code (Press Enter to Apply)",
         "code_success": "✅ Code Applied! Price updated.",
         "code_invalid": "❌ Code invalid for this item.",
         "code_already_used": "⚠️ You have already used this code!",
@@ -110,7 +147,7 @@ LOCALES = {
         "tabs": ["🛒 Obchod / Tržiště", "📜 Záznamy Trestů", "⚡ Teleport Tracker", "🎟️ Slevové Kódy"],
         "marketplace": "Serverové Tržiště",
         "create_listing": "➕ Vytvořit Nabídku (Sleva / Zpožděný prodej / Aukce)",
-        "item_name": "Výběr Předmětu",
+        "item_name": "Výběr Předmětu (Pište pro hledání)",
         "custom_item": "Zadejte vlastní název předmětu",
         "suggested": "💡 Doporučená cena:",
         "diamonds": "Diamantů",
@@ -157,7 +194,7 @@ LOCALES = {
         "btn_create_code": "Generovat Kód",
         "active_codes": "Aktivní Slevové Kódy",
         "code_table_cols": ["Kód", "Tvůrce", "Sleva", "Rozsah / ID"],
-        "use_code_input": "Zadejte slevový kód",
+        "use_code_input": "Zadejte slevový kód (Potvrďte klávesou Enter)",
         "code_success": "✅ Kód uplatněn! Cena byla upravena.",
         "code_invalid": "❌ Neplatný slevový kód pro tuto položku.",
         "code_already_used": "⚠️ Tento kód jsi již jednou použil!",
@@ -347,10 +384,16 @@ with tab1:
     
     if st.session_state.current_user:
         with st.expander(T["create_listing"]):
-            selected_item_key = st.selectbox(T["item_name"], list(PRICE_SUGGESTIONS.keys()))
+            # 🔍 Default Searchable Selection Box with Custom Item at index 0
+            selected_item_key = st.selectbox(
+                T["item_name"], 
+                list(PRICE_SUGGESTIONS.keys()),
+                help="Type to search through available suggestions / Zapište pro vyhledávání v doporučeních"
+            )
+            
             if selected_item_key == "Custom Item / Jiný předmět":
-                final_item_name = st.text_input(T["custom_item"])
-                suggested_val = 10
+                final_item_name = st.text_input(T["custom_item"], placeholder="e.g. Diamond Sword with Fire Aspect").strip()
+                suggested_val = 0
             else:
                 final_item_name = selected_item_key
                 suggested_val = PRICE_SUGGESTIONS[selected_item_key]
@@ -432,8 +475,18 @@ with tab1:
     if df_trades.empty or 'item' not in df_trades.columns:
         st.write(T["no_items"])
     else:
+        # 🔍 SEARCH BAR COMPONENT FOR ACTIVE MARKET LISTINGS
+        search_query = st.text_input("🔍 Search items or sellers / Hledat předměty nebo prodejce", "").strip().lower()
+        
         now_str = datetime.now().isoformat()
         for idx, row in df_trades.iterrows():
+            item_name_lower = str(row.get('item', '')).lower()
+            seller_name_lower = str(row.get('seller', '')).lower()
+            
+            # Skip loop step if item/seller does not match search parameters
+            if search_query and (search_query not in item_name_lower and search_query not in seller_name_lower):
+                continue
+                
             col1, col2 = st.columns([4, 2])
             
             display_price = str(row.get('price', 'Free'))
@@ -499,7 +552,7 @@ with tab1:
                                     price_after_code = round(base_num * (1 - discount_amt / 100))
                                     st.success(f"{T['code_success']} ✨ **{price_after_code} {T['diamonds']}** ({discount_amt}% OFF)")
                                     
-                                    # Automatically log one-time use into database since no confirmation button is needed
+                                    # Code gets claimed and locked instantly
                                     if f"last_logged_{row['id']}" not in st.session_state or st.session_state[f"last_logged_{row['id']}"] != code_name_clean:
                                         new_claim = pd.DataFrame([{"username": user_clean, "code": code_name_clean}])
                                         st.session_state.df_claimed = pd.concat([df_claimed, new_claim], ignore_index=True)
@@ -653,10 +706,9 @@ with tab4:
                     st.success("Sale Code Created Successfully!")
                     st.rerun()
                     
-        # 🔒 PRIVATE SECRETS DASHBOARD
+        # 🔒 PRIVATE SECRETS DASHBOARD (Admin sees everything, owners see their own creations)
         st.subheader(T["active_codes"])
         if not df_codes.empty and "code" in df_codes.columns:
-            # Filters view: Admin sees everything, owners see their own creations
             private_df = df_codes[is_admin | (df_codes['creator'].astype(str) == st.session_state.current_user)]
             
             if not private_df.empty:
@@ -683,12 +735,10 @@ with tab4:
                     st.caption("🗑️ **Delete Code Matrix Node**")
                     code_to_delete = st.selectbox(T["delete_code_label"], [""] + list(private_df["code"].unique()), key="sb_delete_node")
                     if code_to_delete and st.button(T["delete_code_label"], key="btn_delete_node"):
-                        # Remove code entry row completely
                         updated_codes = df_codes[df_codes["code"].astype(str).str.upper() != str(code_to_delete).upper()]
                         st.session_state.df_codes = updated_codes
                         save_sheet_data(updated_codes, "codes")
                         
-                        # Wipe related historic log files to keep sheet size efficient
                         if not df_claimed.empty and "code" in df_claimed.columns:
                             updated_claims = df_claimed[df_claimed["code"].astype(str).str.upper() != str(code_to_delete).upper()]
                             st.session_state.df_claimed = updated_claims
