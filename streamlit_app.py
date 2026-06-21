@@ -69,6 +69,8 @@ def calculate_delta(amount, unit):
 
 # Helper to easily show human-readable remaining time
 def format_time_remaining(target_iso):
+    if pd.isna(target_iso) or str(target_iso).strip() in ["", "nan", "Permanent"]:
+        return "Permanent (No Expiration)"
     try:
         delta = datetime.fromisoformat(str(target_iso)) - datetime.now()
         total_seconds = delta.total_seconds()
@@ -81,7 +83,7 @@ def format_time_remaining(target_iso):
         else:
             return f"{round(total_seconds / 86400, 1)}d remaining"
     except:
-        return "Unknown time"
+        return "Permanent (No Expiration)"
 
 # Helper to pull numeric values from item text strings safely
 def extract_numeric_price(price_str):
@@ -115,18 +117,16 @@ if "current_user" not in st.session_state:
 df_trades_current = st.session_state.df_trades
 if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
     now_str = datetime.now().isoformat()
-    
-    # 📢 FIXED: Safely convert the column to string type so comparisons never crash
     expires_str_series = df_trades_current["expires_at"].astype(str).str.strip()
     
-    # Keep rows where expiration is missing, empty, or still in the future
+    # Filter out trades that have expired, but preserve empty strings, nan, or "Permanent"
     valid_trades = df_trades_current[
         (df_trades_current["expires_at"].isna()) | 
         (expires_str_series == "") | 
         (expires_str_series == "nan") | 
+        (expires_str_series == "Permanent") | 
         (expires_str_series > now_str)
     ]
-    
     if len(valid_trades) != len(df_trades_current):
         st.session_state.df_trades = valid_trades
         save_sheet_data(valid_trades, "trades")
@@ -189,11 +189,16 @@ with tab1:
             listing_type = st.radio("Listing Format", ["Standard Fix Price", "Auction (Bidding)"])
             
             st.markdown("##### Duration Settings")
-            col_dur, col_unit = st.columns([2, 2])
-            with col_dur:
-                duration_amount = st.number_input("Time Amount", min_value=1, value=2)
-            with col_unit:
-                duration_unit = st.selectbox("Time Unit", ["Minutes", "Hours", "Days"], index=1)
+            is_permanent = st.checkbox("Stay Forever (No Expiration Timer)", value=False)
+            
+            duration_amount = 2
+            duration_unit = "Hours"
+            if not is_permanent:
+                col_dur, col_unit = st.columns([2, 2])
+                with col_dur:
+                    duration_amount = st.number_input("Time Amount", min_value=1, value=2)
+                with col_unit:
+                    duration_unit = st.selectbox("Time Unit", ["Minutes", "Hours", "Days"], index=1)
                 
             if listing_type == "Standard Fix Price":
                 base_price_val = st.number_input("Base Price (Diamonds)", min_value=1, value=10)
@@ -236,7 +241,7 @@ with tab1:
             if st.button("Publish Listing"):
                 if item:
                     next_id = int(df_trades["id"].max() + 1) if not df_trades.empty and 'id' in df_trades.columns else 1
-                    exp_time = (datetime.now() + calculate_delta(duration_amount, duration_unit)).isoformat()
+                    exp_time = "Permanent" if is_permanent else (datetime.now() + calculate_delta(duration_amount, duration_unit)).isoformat()
                     
                     new_trade = pd.DataFrame([{
                         "id": next_id,
@@ -295,8 +300,12 @@ with tab1:
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                if pd.notna(row.get('expires_at')) and row['expires_at'] != "":
-                    st.caption(f"⏳ Time left: {format_time_remaining(row['expires_at'])}")
+                # Expiration read text display
+                exp_status = format_time_remaining(row.get('expires_at'))
+                if exp_status == "Permanent a No Expiration" or "Permanent" in exp_status:
+                    st.caption("⏳ **Time left: Stay Forever**")
+                else:
+                    st.caption(f"⏳ Time left: {exp_status}")
             
             with col2:
                 is_admin = st.session_state.current_user == "admin"
@@ -318,6 +327,28 @@ with tab1:
                 
                 # --- PORTAL TO MODIFY OR REMOVE SALES ---
                 if not is_item_auction and (is_seller or is_admin):
+                    # 1. NEW COMPONENT: EXPIRATION MANAGEMENT FOR LIVE ITEMS
+                    with st.expander("⏳ Manage Expiration"):
+                        mod_perm = st.checkbox("Make Permanent (Stay Forever)", value=("Permanent" in exp_status or pd.isna(row.get('expires_at')) or str(row.get('expires_at')) == ""), key=f"mod_perm_{row['id']}")
+                        
+                        if not mod_perm:
+                            col_m_amt, col_m_unit = st.columns(2)
+                            with col_m_amt:
+                                mod_amount = st.number_input("Add Time", min_value=1, value=10, key=f"mod_amt_{row['id']}")
+                            with col_m_unit:
+                                mod_unit = st.selectbox("Unit", ["Minutes", "Hours", "Days"], index=1, key=f"mod_unit_{row['id']}")
+                        
+                        if st.button("Update Expiration", key=f"mod_exp_btn_{row['id']}"):
+                            if mod_perm:
+                                df_trades.at[idx, 'expires_at'] = "Permanent"
+                            else:
+                                df_trades.at[idx, 'expires_at'] = (datetime.now() + calculate_delta(mod_amount, mod_unit)).isoformat()
+                            st.session_state.df_trades = df_trades
+                            save_sheet_data(df_trades, "trades")
+                            st.success("Timer updated successfully!")
+                            st.rerun()
+
+                    # 2. Existing Advanced Sales Interface Form Block
                     if has_any_sale_configured:
                         if st.button("🏷️ Remove Sale", key=f"rm_sale_{row['id']}", help="Wipes discount settings and restores base cost"):
                             df_trades.at[idx, 'sale_price'] = ""
@@ -327,7 +358,6 @@ with tab1:
                             st.success("Sale configuration removed!")
                             st.rerun()
                     else:
-                        # Advanced Live Instant Sale Form
                         with st.expander("🏷️ Trigger Sale"):
                             inst_mode = st.radio("Discount Type", ["Percentage Off", "Make Free"], key=f"inst_mode_{row['id']}")
                             
