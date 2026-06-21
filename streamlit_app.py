@@ -170,7 +170,7 @@ LOCALES = {
 
 st.sidebar.header("🌐 Language / Jazyk")
 lang = st.sidebar.selectbox("Choose Language", ["English", "Čeština"])
-T = locales_map = LOCALES[lang]
+T = LOCALES[lang]
 
 st.title(T["title"])
 
@@ -308,6 +308,7 @@ with tab1:
     df_claimed = st.session_state.df_claimed
     
     if st.session_state.current_user:
+        # EXPANDER 1: CREATE NEW ITEMS
         with st.expander(T["create_listing"]):
             selected_item_key = st.selectbox(T["item_name"], list(PRICE_SUGGESTIONS.keys()))
             suggested_val, suggested_amount = PRICE_SUGGESTIONS[selected_item_key]
@@ -325,8 +326,8 @@ with tab1:
                 text_input = st.text_input(T["enchants_placeholder"])
                 enchants = [e.strip() for e in text_input.split(",") if e.strip()]
             
-            # ─── UPDATED FORMAT MATCHING YOUR LABELS ────────────────────────────────
-            listing_type = st.radio(T["format"], ["Standard Fix Price", "Flash Sale / Discount", "Auction (Bidding)"])
+            # --- UPDATED FORMAT OPTIONS ---
+            listing_type = st.radio(T["format"], ["Standard Fix Price", "Flash Sale / Discount", "Scheduled Sale Delay", "Auction (Bidding)"])
             
             st.markdown(T["duration_settings"])
             is_permanent = st.checkbox(T["stay_forever"], value=False)
@@ -340,6 +341,7 @@ with tab1:
                 
             is_auction_val = False
             sale_price_val = ""
+            sale_at_val = ""
             
             if listing_type == "Standard Fix Price":
                 base_price_val = st.number_input(T["base_price"], min_value=1, value=suggested_val if suggested_val > 0 else 10)
@@ -349,6 +351,17 @@ with tab1:
                 sale_price_input = st.number_input("Direct Sale Price (Diamonds)", min_value=1, value=max(1, suggested_val - 2))
                 price_string = f"🔥 SALE: {sale_price_input} Diamonds (Was {base_price_val} 💎)"
                 sale_price_val = str(sale_price_input)
+                sale_at_val = datetime.now().isoformat()
+            elif listing_type == "Scheduled Sale Delay":
+                base_price_val = st.number_input("Standard Starting Price (Diamonds)", min_value=1, value=suggested_val if suggested_val > 0 else 10)
+                delay_pct = st.slider("Future Discount Percentage (%)", 5, 95, 25)
+                delay_amount = st.number_input("Delay Count Duration", min_value=1, value=15)
+                delay_unit = st.selectbox("Delay Time Units", ["Minutes", "Hours", "Days"])
+                
+                calculated_markdown = round(base_price_val * (1 - delay_pct / 100))
+                price_string = f"{base_price_val} Diamonds" # Evaluated real-time on view down below
+                sale_price_val = f"DELAYED_{delay_pct}_{base_price_val}"
+                sale_at_val = (datetime.now() + calculate_delta(delay_amount, delay_unit)).isoformat()
             else:
                 base_price_val = st.number_input(T["start_bid"], min_value=1, value=suggested_val if suggested_val > 0 else 5)
                 price_string = f"Starting bid: {base_price_val} Diamonds"
@@ -363,12 +376,36 @@ with tab1:
                         "id": next_id, "seller": st.session_state.current_user, "item": final_item_name,
                         "amount": int(item_amount_val), "enchants": str(enchants), "price": price_string,
                         "created_at": datetime.now().isoformat(), "expires_at": exp_time, "sale_price": sale_price_val,
-                        "sale_at": datetime.now().isoformat() if sale_price_val else "", "is_auction": is_auction_val, 
-                        "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
+                        "sale_at": sale_at_val, "is_auction": is_auction_val, "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
                     }])
                     st.session_state.df_trades = pd.concat([df_trades, new_trade], ignore_index=True)
                     save_sheet_data(st.session_state.df_trades, "trades")
                     st.rerun()
+
+        # EXPANDER 2: APPLY SALE TO EXISTING / CURRENT RUNNING ITEMS
+        if not df_trades.empty and 'seller' in df_trades.columns:
+            user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == st.session_state.current_user.lower()) & (df_trades['is_auction'] == False)]
+            if not user_items.empty:
+                with st.expander("🏷️ Shop Owner Control Panel: Put Active Items on Sale"):
+                    item_options = {f"ID {r['id']} - {r['item']} ({r['amount']}x)": r['id'] for _, r in user_items.iterrows()}
+                    selected_target_str = st.selectbox("Choose running item to discount:", list(item_options.keys()))
+                    target_id = item_options[selected_target_str]
+                    
+                    instant_discount_pct = st.slider("Apply Discount Amount (%)", 5, 90, 20)
+                    if st.button("Apply Discount Instantly"):
+                        matching_idx = df_trades[df_trades['id'] == target_id].index[0]
+                        orig_price_str = df_trades.at[matching_idx, 'price']
+                        orig_num = extract_numeric_price(orig_price_str)
+                        if orig_num > 0:
+                            new_markdown = round(orig_num * (1 - instant_discount_pct / 100))
+                            df_trades.at[matching_idx, 'price'] = f"🔥 SALE: {new_markdown} Diamonds (Was {orig_num} 💎)"
+                            df_trades.at[matching_idx, 'sale_price'] = str(new_markdown)
+                            df_trades.at[matching_idx, 'sale_at'] = datetime.now().isoformat()
+                            
+                            st.session_state.df_trades = df_trades
+                            save_sheet_data(df_trades, "trades")
+                            st.success("Discount active!")
+                            st.rerun()
 
     st.subheader(T["active_listings"])
     global_promo_input = st.text_input(T["global_coupon_label"], placeholder=T["global_coupon_placeholder"]).strip().upper() if st.session_state.current_user else ""
@@ -382,6 +419,25 @@ with tab1:
             item_name_lower = str(row.get('item', '')).lower()
             row_id_str = str(row.get('id', '')).strip()
             
+            # --- EVALUATE SCHEDULED AUTOMATIC SALES IN REAL-TIME ---
+            sale_price_field = str(row.get('sale_price', ''))
+            sale_at_field = str(row.get('sale_at', ''))
+            if "DELAYED_" in sale_price_field and sale_at_field:
+                try:
+                    trigger_time = datetime.fromisoformat(sale_at_field)
+                    if datetime.now() >= trigger_time:
+                        parts = sale_price_field.split("_")
+                        pct_val = int(parts[1])
+                        orig_val = int(parts[2])
+                        discounted_val = round(orig_val * (1 - pct_val / 100))
+                        
+                        # Apply live update to data state
+                        display_price = f"🔥 SALE: {discounted_val} Diamonds (Was {orig_val} 💎)"
+                        df_trades.at[idx, 'price'] = display_price
+                        df_trades.at[idx, 'sale_price'] = str(discounted_val)
+                        save_sheet_data(df_trades, "trades")
+                except: pass
+
             code_success_msg = None
             if global_promo_input and not df_codes.empty:
                 matched_code = df_codes[df_codes['code'].astype(str).str.upper() == global_promo_input]
@@ -414,6 +470,11 @@ with tab1:
             with col1:
                 st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({row['amount']}x)**")
                 st.markdown(f"Price: **{display_price}**")
+                
+                # Show timer badge for upcoming sales
+                if "DELAYED_" in sale_price_field and datetime.now() < datetime.fromisoformat(sale_at_field):
+                    st.info(f"⏳ Scheduled Markdown starting in: {format_time_remaining(sale_at_field)}")
+                    
                 if code_success_msg == "OWN_CODE_PROHIBITED": 
                     st.warning("⚠️ Access Denied: You cannot use promo codes you created. This code has been rendered invalid for your account.")
                 elif code_success_msg == "BLOCKED_BLACKLIST": st.error(T["code_blocked_msg"])
@@ -611,7 +672,6 @@ with tab4:
                 viewer_lower = st.session_state.current_user.lower()
                 
                 if viewer_lower == "admin" or creator_lower == viewer_lower:
-                    # Gather claims information for this code
                     code_claims_df = pd.DataFrame()
                     claims_count = 0
                     if not df_claimed.empty and "code" in df_claimed.columns:
@@ -637,7 +697,6 @@ with tab4:
                                     save_sheet_data(st.session_state.df_claimed, "claimed_codes")
                                     st.rerun()
                         
-                        # Sub-expander for granular tracking inside this promo code item
                         if claims_count > 0:
                             with st.expander(f"🔍 View Users / Delete Specific Usage ({claims_count})"):
                                 for claim_idx, claim_row in code_claims_df.iterrows():
