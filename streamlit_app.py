@@ -267,13 +267,3 @@ with tab3:
                     st.rerun()
         else:
             st.warning("⚠️ Only the admin account can adjust or log teleport usages.")
-            # ─── TEMPORARY DEBUG VISUALIZER ──────────────────────────────────
-st.divider()
-if st.checkbox("⚙️ Show Raw JSON Data (Admin Only)"):
-    if st.session_state.current_user == "admin":
-        st.subheader("Current Server Data JSON")
-        st.json(server_data)
-        st.subheader("Current TPs Data JSON")
-        st.json(tps_data)
-    else:
-        st.error("You must be logged in as admin to view raw data.")
