@@ -468,7 +468,7 @@ with tab1:
 
                     # Trigger Sale Interface
                     if has_any_sale_configured:
-                        if st.button(T["remove_sale"], key=f"rm_sale_{row['id'] concrete}"):
+                        if st.button(T["remove_sale"], key=f"rm_sale_{row['id']}"):
                             df_trades.at[idx, 'sale_price'] = ""
                             df_trades.at[idx, 'sale_at'] = ""
                             st.session_state.df_trades = df_trades
