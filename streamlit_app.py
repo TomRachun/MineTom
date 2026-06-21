@@ -30,12 +30,37 @@ def get_sheet_data(worksheet_name):
         st.error(f"Failed to read tab '{worksheet_name}'. Verify the tab name exists in your Google Sheet exactly as written.")
         st.stop()
 
-# Helper function to write rows back via HTML POST form endpoint
+# Helper function to write rows back via your Google web app script
 def save_sheet_data(df, worksheet_name):
-    # Temporary session storage fallback if writeback fails
-    st.warning("Data saved to temporary live instance. For full persistent write-backs, ensure Google Sheet column headers match exactly.")
+    if "gsheets_write_url" not in st.secrets:
+        return
+        
+    # Standardize columns to match your sheets layout exactly
+    if worksheet_name == "users":
+        cols = ["username", "password"]
+    elif worksheet_name == "trades":
+        cols = ["id", "seller", "item", "enchants", "price", "created_at"]
+    elif worksheet_name == "tps":
+        cols = ["username", "remaining_tps"]
+        if "username_clean" in df.columns:
+            df = df.drop(columns=["username_clean"])
+            
+    # Reindex so empty datasets don't miss column alignments
+    df_save = df.reindex(columns=cols).fillna("")
+    rows_list = df_save.values.tolist()
+    
+    payload = {
+        "action": "clear_and_save",
+        "sheet": worksheet_name,
+        "data": rows_list
+    }
+    
+    try:
+        requests.post(st.secrets["gsheets_write_url"], json=payload)
+    except Exception as e:
+        st.error("Write-back connection failed.")
 
-# Initialize dataframes into session state so they persist nicely during clicks
+# Initialize dataframes into session state if not already done
 if "df_users" not in st.session_state:
     st.session_state.df_users = get_sheet_data("users")
 if "df_trades" not in st.session_state:
@@ -72,6 +97,10 @@ if st.session_state.current_user is None:
             else:
                 new_user = pd.DataFrame([{"username": auth_user, "password": auth_pass}])
                 st.session_state.df_users = pd.concat([df, new_user], ignore_index=True)
+                
+                # 📢 FIXED: Saves new user live to Google Sheets!
+                save_sheet_data(st.session_state.df_users, "users")
+                
                 st.sidebar.success(f"Registered {auth_user}! Please log in.")
                 st.rerun()
 else:
@@ -96,8 +125,8 @@ with tab1:
             is_enchantable = st.checkbox("Enchantable?")
             enchants = []
             if is_enchantable:
-                ench_input = st.text_input("Enchants (comma separated)")
-                enchants = [e.strip() for e in ench_input.split(",") if e.strip()]
+                text_input = st.text_input("Enchants (comma separated)")
+                enchants = [e.strip() for e in text_input.split(",") if e.strip()]
             price = st.text_input("Price (e.g., 10 Diamantů)")
             
             if st.button("Post Trade"):
@@ -112,6 +141,10 @@ with tab1:
                         "created_at": datetime.now().isoformat()
                     }])
                     st.session_state.df_trades = pd.concat([df_trades, new_trade], ignore_index=True)
+                    
+                    # 📢 FIXED: Saves new trade live to Google Sheets!
+                    save_sheet_data(st.session_state.df_trades, "trades")
+                    
                     st.success("Trade posted successfully!")
                     st.rerun()
                 else:
@@ -135,6 +168,10 @@ with tab1:
                 if is_admin or is_seller:
                     if st.button("❌ Delete", key=f"del_trade_{idx}"):
                         st.session_state.df_trades = df_trades.drop(idx)
+                        
+                        # 📢 FIXED: Saves the deletion live to Google Sheets!
+                        save_sheet_data(st.session_state.df_trades, "trades")
+                        
                         st.success("Trade deleted!")
                         st.rerun()
             st.divider()
@@ -164,6 +201,9 @@ with tab3:
             new_tp_user = pd.DataFrame([{"username": tp_username, "remaining_tps": MAX_TPS, "username_clean": tp_username}])
             df_tps = pd.concat([df_tps, new_tp_user], ignore_index=True)
             st.session_state.df_tps = df_tps
+            
+            # 📢 FIXED: Saves newly added player tracked count to Google Sheets!
+            save_sheet_data(df_tps, "tps")
             current_tps = MAX_TPS
         else:
             current_tps = int(user_tp_row.iloc[0]['remaining_tps'])
@@ -181,6 +221,10 @@ with tab3:
                     else:
                         df_tps.at[user_idx, 'remaining_tps'] = current_tps - 1
                         st.session_state.df_tps = df_tps
+                        
+                        # 📢 FIXED: Saves updated TP consumption row count to Google Sheets!
+                        save_sheet_data(df_tps, "tps")
+                        
                         st.success(f"Teleport tracked for {tp_username}!")
                         st.rerun()
                         
@@ -188,6 +232,10 @@ with tab3:
                 if st.button("🔄 Admin Reset to Full", key="btn_reset_tp"):
                     df_tps.at[user_idx, 'remaining_tps'] = MAX_TPS
                     st.session_state.df_tps = df_tps
+                    
+                    # 📢 FIXED: Saves the admin replenishment value to Google Sheets!
+                    save_sheet_data(df_tps, "tps")
+                    
                     st.success(f"Reset completed for {tp_username}!")
                     st.rerun()
         else:
