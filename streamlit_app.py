@@ -10,13 +10,11 @@ TODAY = str(date.today())
 st.title("⛏️ Minecraft Server Management Portal")
 
 # ─── GOOGLE SHEETS CONNECTION ─────────────────────────────────────
-# This connects straight to the URL you saved in your secrets
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
 except Exception as e:
     st.error("Missing configuration. Please check your public_gsheets_url in Streamlit Secrets.")
     st.stop()
-
 
 # Helper function to easily read worksheets as DataFrames
 def get_sheet_data(worksheet_name):
@@ -91,7 +89,7 @@ with tab1:
             enchants = []
             if is_enchantable:
                 ench_input = st.text_input("Enchants (comma separated)")
-                enchants = [e.strip() for e in len_input.split(",") if e.strip()]
+                enchants = [e.strip() for e in ench_input.split(",") if e.strip()]
             price = st.text_input("Price (e.g., 10 Diamantů)")
             
             if st.button("Post Trade"):
@@ -140,8 +138,7 @@ with tab1:
 # ==========================================
 with tab2:
     st.header("Punishment Case Management")
-    st.info("Note: Cases functionality is pulled from your local memory. Connect a sheet tab if needed.")
-    st.write("Cases are currently cleared out on reboot. To make them permanent, create a 'cases' worksheet tab.")
+    st.info("Note: Case tracking is cleared on reboot. To make them permanent later, you can add a 'cases' sheet tab.")
 
 # ==========================================
 # TAB 3: TELEPORT TRACKER (ADMIN CONTROLLED)
