@@ -440,28 +440,30 @@ with tab1:
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                # Live Promo Code Entry Field Box inside item card view layout
+              # Live Promo Code Entry Field Box inside item card view layout
                 if not (str(row.get('is_auction')) == "True" or row.get('is_auction') is True):
                     promo_input = st.text_input(T["use_code_input"], key=f"promo_field_{row['id']}").strip()
                     if promo_input and not df_codes.empty:
                         matched_code = df_codes[df_codes['code'].astype(str).str.upper() == promo_input.upper()]
                         if not matched_code.empty:
                             code_row = matched_code.iloc[0]
-                            creator = str(code_row['creator'])
-                            scope = str(code_row['target_ids'])
-                            discount_amt = int(code_row['discount'])
+                            
+                            # 📢 FIXED: Using .get() with a fallback prevents KeyError crashes
+                            creator = str(code_row.get('creator', ''))
+                            scope = str(code_row.get('target_ids', 'GLOBAL'))
+                            discount_amt = int(code_row.get('discount', 0))
                             
                             is_valid_code = False
                             if creator == "admin" and scope == "GLOBAL":
                                 is_valid_code = True
                             elif creator == row['seller'] and scope == "GLOBAL":
                                 is_valid_code = True
-                            elif scope != "GLOBAL":
+                            elif scope != "GLOBAL" and scope != "":
                                 parsed_ids = [id_item.strip() for id_item in scope.split(",") if id_item.strip()]
                                 if str(row['id']) in parsed_ids:
                                     is_valid_code = True
                                     
-                            if is_valid_code:
+                            if is_valid_code and discount_amt > 0:
                                 base_num = extract_numeric_price(display_price)
                                 price_after_code = round(base_num * (1 - discount_amt / 100))
                                 st.success(f"{T['code_success']} ✨ **{price_after_code} {T['diamonds']}** ({discount_amt}% OFF)")
