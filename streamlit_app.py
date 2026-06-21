@@ -74,11 +74,19 @@ LOCALES = {
         "login": "Login",
         "register": "Register",
         "logout": "Logout",
+        "change_pass_header": "🔒 Change Your Password",
+        "new_password": "New Password",
+        "update_pass_btn": "Update Password",
+        "pass_update_success": "✅ Password updated successfully!",
+        "admin_reset_header": "🛡️ Admin Password Reset",
+        "select_player": "Select Player",
+        "reset_pass_btn": "Reset Player Password",
         "tabs": ["🛒 Trade Store", "📜 Case Records", "⚡ Teleport Tracker", "🎟️ Sale Codes"],
         "marketplace": "Server Marketplace",
         "create_listing": "➕ Create Listing (Sale / Sale Delay / Auction)",
         "item_name": "Item Selection (Type to Search)",
         "custom_item": "Enter Custom Item Name",
+        "item_amount": "Amount / Quantity",
         "suggested": "💡 Suggested Price:",
         "diamonds": "Diamonds",
         "enchantable": "Enchantable?",
@@ -144,11 +152,19 @@ LOCALES = {
         "login": "Přihlásit se",
         "register": "Registrovat",
         "logout": "Odhlásit se",
+        "change_pass_header": "🔒 Změna Vašeho Hesla",
+        "new_password": "Nové Heslo",
+        "update_pass_btn": "Aktualizovat Heslo",
+        "pass_update_success": "✅ Heslo bylo úspěšně změněno!",
+        "admin_reset_header": "🛡️ Admin Reset Hesla",
+        "select_player": "Vyberte Hráče",
+        "reset_pass_btn": "Resetovat Heslo Hráče",
         "tabs": ["🛒 Obchod / Tržiště", "📜 Záznamy Trestů", "⚡ Teleport Tracker", "🎟️ Slevové Kódy"],
         "marketplace": "Serverové Tržiště",
         "create_listing": "➕ Vytvořit Nabídku (Sleva / Zpožděný prodej / Aukce)",
         "item_name": "Výběr Předmětu (Pište pro hledání)",
         "custom_item": "Zadejte vlastní název předmětu",
+        "item_amount": "Množství / Počet",
         "suggested": "💡 Doporučená cena:",
         "diamonds": "Diamantů",
         "enchantable": "Očarovatelný (Enchanty)?",
@@ -237,7 +253,8 @@ def save_sheet_data(df, worksheet_name):
     if worksheet_name == "users":
         cols = ["username", "password"]
     elif worksheet_name == "trades":
-        cols = ["id", "seller", "item", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
+        # Note: 'amount' column included to handle database syncing correctly
+        cols = ["id", "seller", "item", "amount", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
     elif worksheet_name == "codes":
         cols = ["code", "creator", "discount", "target_ids"]
     elif worksheet_name == "claimed_codes":
@@ -332,6 +349,7 @@ if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
         save_sheet_data(valid_trades, "trades")
 
 if st.button(T["refresh_btn"], use_container_width=True):
+    st.session_state.df_users = get_sheet_data("users")
     st.session_state.df_trades = get_sheet_data("trades")
     st.session_state.df_codes = get_sheet_data("codes")
     st.session_state.df_claimed = get_sheet_data("claimed_codes")
@@ -370,6 +388,42 @@ else:
     if st.sidebar.button(T["logout"]):
         st.session_state.current_user = None
         st.rerun()
+        
+    st.sidebar.markdown("---")
+    
+    st.sidebar.subheader(T["change_pass_header"])
+    new_pass_input = st.sidebar.text_input(T["new_password"], type="password", key="owner_change_pass_field")
+    if st.sidebar.button(T["update_pass_btn"], key="owner_change_pass_btn"):
+        if new_pass_input.strip():
+            df_u = st.session_state.df_users
+            user_clean = str(st.session_state.current_user).strip().lower()
+            matched_indices = df_u[df_u['username'].astype(str).str.strip().str.lower() == user_clean].index
+            if not matched_indices.empty:
+                df_u.at[matched_indices[0], 'password'] = str(new_pass_input).strip()
+                st.session_state.df_users = df_u
+                save_sheet_data(df_u, "users")
+                st.sidebar.success(T["pass_update_success"])
+                time.sleep(1)
+                st.rerun()
+
+    if st.session_state.current_user == "admin":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader(T["admin_reset_header"])
+        df_u = st.session_state.df_users
+        if not df_u.empty and 'username' in df_u.columns:
+            player_list = sorted(list(df_u['username'].astype(str).str.strip().values))
+            selected_player_to_reset = st.sidebar.selectbox(T["select_player"], player_list, key="admin_sb_p_reset")
+            admin_new_pass = st.sidebar.text_input(T["new_password"], type="password", key="admin_txt_p_reset")
+            if st.sidebar.button(T["reset_pass_btn"], key="admin_btn_p_reset"):
+                if selected_player_to_reset and admin_new_pass.strip():
+                    matched_admin_idx = df_u[df_u['username'].astype(str).str.strip() == str(selected_player_to_reset)].index
+                    if not matched_admin_idx.empty:
+                        df_u.at[matched_admin_idx[0], 'password'] = str(admin_new_pass).strip()
+                        st.session_state.df_users = df_u
+                        save_sheet_data(df_u, "users")
+                        st.sidebar.success(f"Successfully reset password for {selected_player_to_reset}!")
+                        time.sleep(1)
+                        st.rerun()
 
 tab1, tab2, tab3, tab4 = st.tabs(T["tabs"])
 
@@ -384,7 +438,6 @@ with tab1:
     
     if st.session_state.current_user:
         with st.expander(T["create_listing"]):
-            # 🔍 Default Searchable Selection Box with Custom Item at index 0
             selected_item_key = st.selectbox(
                 T["item_name"], 
                 list(PRICE_SUGGESTIONS.keys()),
@@ -398,6 +451,9 @@ with tab1:
                 final_item_name = selected_item_key
                 suggested_val = PRICE_SUGGESTIONS[selected_item_key]
                 st.caption(f"{T['suggested']} **{suggested_val} {T['diamonds']}**")
+            
+            # 📦 NEW QUANTITY SELECTION FIELD
+            item_amount_val = st.number_input(T["item_amount"], min_value=1, value=1, step=1)
                 
             is_enchantable = st.checkbox(T["enchantable"])
             enchants = []
@@ -457,6 +513,7 @@ with tab1:
                         "id": next_id,
                         "seller": st.session_state.current_user,
                         "item": final_item_name,
+                        "amount": int(item_amount_val),
                         "enchants": str(enchants),
                         "price": price_string,
                         "created_at": datetime.now().isoformat(),
@@ -475,7 +532,6 @@ with tab1:
     if df_trades.empty or 'item' not in df_trades.columns:
         st.write(T["no_items"])
     else:
-        # 🔍 SEARCH BAR COMPONENT FOR ACTIVE MARKET LISTINGS
         search_query = st.text_input("🔍 Search items or sellers / Hledat předměty nebo prodejce", "").strip().lower()
         
         now_str = datetime.now().isoformat()
@@ -483,7 +539,6 @@ with tab1:
             item_name_lower = str(row.get('item', '')).lower()
             seller_name_lower = str(row.get('seller', '')).lower()
             
-            # Skip loop step if item/seller does not match search parameters
             if search_query and (search_query not in item_name_lower and search_query not in seller_name_lower):
                 continue
                 
@@ -499,20 +554,23 @@ with tab1:
                     time_info = format_time_remaining(row['sale_at'])
                     display_price += f" (Drops to {row['sale_price']} in {time_info})"
 
+            # Extract amount representation nicely
+            raw_amt = row.get('amount')
+            amt_badge = f" ({int(raw_amt)}x)" if pd.notna(raw_amt) and str(raw_amt).strip() != "" else ""
+
             with col1:
                 if str(row.get('is_auction')) == "True" or row.get('is_auction') is True:
-                    st.markdown(f"**🏆 [AUCTION] ID {row['id']}: {row['seller']}'s {row['item']}**")
+                    st.markdown(f"**🏆 [AUCTION] ID {row['id']}: {row['seller']}'s {row['item']}{amt_badge}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                     if row.get('highest_bidder'):
                         st.markdown(f"Current Bid: **{row['highest_bid']} Diamonds** by `{row['highest_bidder']}`")
                     else:
                         st.markdown(f"Starting Bid: **{row['highest_bid']} Diamonds**")
                 else:
-                    st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']}**")
+                    st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']}{amt_badge}**")
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                # Live Promo Code Auto-Evaluation Field
                 if not (str(row.get('is_auction')) == "True" or row.get('is_auction') is True):
                     promo_input = st.text_input(T["use_code_input"], key=f"promo_field_{row['id']}").strip()
                     if promo_input and not df_codes.empty:
@@ -552,7 +610,6 @@ with tab1:
                                     price_after_code = round(base_num * (1 - discount_amt / 100))
                                     st.success(f"{T['code_success']} ✨ **{price_after_code} {T['diamonds']}** ({discount_amt}% OFF)")
                                     
-                                    # Code gets claimed and locked instantly
                                     if f"last_logged_{row['id']}" not in st.session_state or st.session_state[f"last_logged_{row['id']}"] != code_name_clean:
                                         new_claim = pd.DataFrame([{"username": user_clean, "code": code_name_clean}])
                                         st.session_state.df_claimed = pd.concat([df_claimed, new_claim], ignore_index=True)
@@ -706,7 +763,6 @@ with tab4:
                     st.success("Sale Code Created Successfully!")
                     st.rerun()
                     
-        # 🔒 PRIVATE SECRETS DASHBOARD (Admin sees everything, owners see their own creations)
         st.subheader(T["active_codes"])
         if not df_codes.empty and "code" in df_codes.columns:
             private_df = df_codes[is_admin | (df_codes['creator'].astype(str) == st.session_state.current_user)]
@@ -716,7 +772,6 @@ with tab4:
                 display_df.columns = T["code_table_cols"]
                 st.dataframe(display_df, use_container_width=True)
                 
-                # 🛠️ GLOBAL MANAGEMENT UTILITIES (REFRESH LIMITS / PERMANENT DELETIONS)
                 st.markdown("---")
                 col_actions_1, col_actions_2 = st.columns(2)
                 
@@ -751,7 +806,6 @@ with tab4:
         else:
             st.caption("No sale codes are currently active.")
             
-        # 📊 TRACK WHO USED CODES
         st.subheader(T["claimed_header"])
         if not df_claimed.empty and "code" in df_claimed.columns:
             if is_admin:
