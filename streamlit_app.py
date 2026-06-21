@@ -2,12 +2,138 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime, date, timedelta
+import time
 
-# ─── CONFIGURATION ────────────────────────────────────────────────
+# ─── AUTO-REFRESH CONFIGURATION ──────────────────────────────────
+# Automatically rerun the app state every 30 seconds to update live countdown timers
+if "last_refresh" not in st.session_state:
+    st.session_state.last_refresh = time.time()
+
+# ─── CONFIGURATION & DATA ────────────────────────────────────────
 MAX_TPS = 3
 TODAY = str(date.today())
 
-st.title("⛏️ Minecraft Server Management Portal")
+# Minecraft Item Price Guide Data (Suggested Values in Diamonds)
+PRICE_SUGGESTIONS = {
+    "Netherite Ingot": 8,
+    "Diamond Block": 9,
+    "Elytra": 150,
+    "Shulker Box": 20,
+    "Enchanted Golden Apple": 50,
+    "Beacon": 60,
+    "Totem of Undying": 30,
+    "Nether Star": 16,
+    "Ancient Debris": 2,
+    "Mending Book": 50,
+    "Custom Item / Jiný předmět": 0
+}
+
+# ─── TRANSLATION DICTIONARY ──────────────────────────────────────
+LOCALES = {
+    "English": {
+        "title": "⛏️ Minecraft Server Management Portal",
+        "auth_header": "User Authentication",
+        "choose_action": "Choose Action",
+        "username": "Username",
+        "password": "Password",
+        "login": "Login",
+        "register": "Register",
+        "logout": "Logout",
+        "tabs": ["🛒 Trade Store", "📜 Case Records", "⚡ Teleport Tracker"],
+        "marketplace": "Server Marketplace",
+        "create_listing": "➕ Create Listing (Sale / Sale Delay / Auction)",
+        "item_name": "Item Selection",
+        "custom_item": "Enter Custom Item Name",
+        "suggested": "💡 Suggested Price:",
+        "diamonds": "Diamonds",
+        "enchantable": "Enchantable?",
+        "enchants_placeholder": "Enchants (comma separated)",
+        "format": "Listing Format",
+        "fixed_price": "Standard Fix Price",
+        "auction_format": "Auction (Bidding)",
+        "duration_settings": "##### Duration Settings",
+        "stay_forever": "Stay Forever (No Expiration Timer)",
+        "time_amount": "Time Amount",
+        "time_unit": "Time Unit",
+        "base_price": "Base Price (Diamonds)",
+        "start_bid": "Starting Bid Price (Diamonds)",
+        "sched_sale": "Schedule a future discount sale?",
+        "adv_sale_header": "##### Advanced Scheduled Sale",
+        "discount_type": "Discount Type",
+        "pct_off_label": "Percentage Off (1-100%)",
+        "make_free_label": "Make Free",
+        "preview": "📊 Sale Preview: Price will drop from {} Diamonds to **{}**",
+        "publish": "Publish Listing",
+        "active_listings": "Active Listings",
+        "no_items": "No items on sale right now.",
+        "time_left": "⏳ Time left: {}",
+        "forever": "Stay Forever",
+        "bid_min": "Bid (Min {})",
+        "place_bid": "🔨 Place Bid",
+        "manage_exp": "⏳ Manage Expiration",
+        "update_exp": "Update Expiration",
+        "trigger_sale": "🏷️ Trigger Sale",
+        "apply_now": "Apply Sale Now",
+        "remove_sale": "🏷️ Remove Sale",
+        "remove_listing": "❌ Remove Listing",
+        "refresh_btn": "🔄 Force Refresh Data"
+    },
+    "Čeština": {
+        "title": "⛏️ Minecraft Server Portál Správy",
+        "auth_header": "Autentizace Uživatele",
+        "choose_action": "Vyberte Akci",
+        "username": "Uživatelské jméno",
+        "password": "Heslo",
+        "login": "Přihlásit se",
+        "register": "Registrovat",
+        "logout": "Odhlásit se",
+        "tabs": ["🛒 Obchod / Tržiště", "📜 Záznamy Trestů", "⚡ Teleport Tracker"],
+        "marketplace": "Serverové Tržiště",
+        "create_listing": "➕ Vytvořit Nabídku (Sleva / Zpožděný prodej / Aukce)",
+        "item_name": "Výběr Předmětu",
+        "custom_item": "Zadejte vlastní název předmětu",
+        "suggested": "💡 Doporučená cena:",
+        "diamonds": "Diamantů",
+        "enchantable": "Očarovatelný (Enchanty)?",
+        "enchants_placeholder": "Enchanty (oddělené čárkou)",
+        "format": "Formát Nabídky",
+        "fixed_price": "Standardní Pevná Cena",
+        "auction_format": "Aukce (Přihazování)",
+        "duration_settings": "##### Nastavení Doby Trvání",
+        "stay_forever": "Zůstat navždy (Bez časovače expirace)",
+        "time_amount": "Množství času",
+        "time_unit": "Časová jednotka",
+        "base_price": "Základní Cena (Diamanty)",
+        "start_bid": "Vyvolávací Cena (Diamanty)",
+        "sched_sale": "Naplánovat budoucí slevu?",
+        "adv_sale_header": "##### Pokročilý Naplánovaný Prodej",
+        "discount_type": "Typ Slevy",
+        "pct_off_label": "Procentuální Sleva (1-100%)",
+        "make_free_label": "Zdarma",
+        "preview": "📊 Náhled slevy: Cena klesne z {} Diamantů na **{}**",
+        "publish": "Publikovat Nabídku",
+        "active_listings": "Aktivní Nabídky",
+        "no_items": "Momentálně nejsou v nabídce žádné položky.",
+        "time_left": "⏳ Zbývající čas: {}",
+        "forever": "Navždy",
+        "bid_min": "Příhoz (Min {})",
+        "place_bid": "🔨 Přihodit",
+        "manage_exp": "⏳ Spravovat Expiraci",
+        "update_exp": "Aktualizovat Expiraci",
+        "trigger_sale": "🏷️ Aktivovat Slevu",
+        "apply_now": "Použít Slevu Ihned",
+        "remove_sale": "🏷️ Odstranit Slevu",
+        "remove_listing": "❌ Odstranit Nabídku",
+        "refresh_btn": "🔄 Vynutit Obnovení Dat"
+    }
+}
+
+# ─── SIDEBAR CONFIGURATION & LANGUAGE SELECTOR ───────────────────
+st.sidebar.header("🌐 Language / Jazyk")
+lang = st.sidebar.selectbox("Choose Language", ["English", "Čeština"])
+T = LOCALES[lang]
+
+st.title(T["title"])
 
 # Validate that the secrets URL exists
 if "public_gsheets_url" not in st.secrets:
@@ -27,7 +153,7 @@ def get_sheet_data(worksheet_name):
     try:
         return pd.read_csv(csv_url)
     except Exception as e:
-        st.error(f"Failed to read tab '{worksheet_name}'. Verify the tab name exists in your Google Sheet exactly as written.")
+        st.error(f"Failed to read tab '{worksheet_name}'.")
         st.stop()
 
 # Helper function to write rows back via your Google web app script
@@ -52,17 +178,16 @@ def save_sheet_data(df, worksheet_name):
         "sheet": worksheet_name,
         "data": rows_list
     }
-    
     try:
         requests.post(st.secrets["gsheets_write_url"], json=payload)
-    except Exception as e:
+    except:
         st.error("Write-back connection failed.")
 
 # Helper to convert dynamic input times to timedelta objects
 def calculate_delta(amount, unit):
-    if unit == "Minutes":
+    if unit in ["Minutes", "Minuty"]:
         return timedelta(minutes=amount)
-    elif unit == "Hours":
+    elif unit in ["Hours", "Hodiny"]:
         return timedelta(hours=amount)
     else:
         return timedelta(days=amount)
@@ -70,20 +195,20 @@ def calculate_delta(amount, unit):
 # Helper to easily show human-readable remaining time
 def format_time_remaining(target_iso):
     if pd.isna(target_iso) or str(target_iso).strip() in ["", "nan", "Permanent"]:
-        return "Permanent (No Expiration)"
+        return T["forever"]
     try:
         delta = datetime.fromisoformat(str(target_iso)) - datetime.now()
         total_seconds = delta.total_seconds()
         if total_seconds <= 0:
             return "Expired"
         if total_seconds < 3600:
-            return f"{round(total_seconds / 60, 1)}m remaining"
+            return f"{round(total_seconds / 60, 1)}m"
         elif total_seconds < 86400:
-            return f"{round(total_seconds / 3600, 1)}h remaining"
+            return f"{round(total_seconds / 3600, 1)}h"
         else:
-            return f"{round(total_seconds / 86400, 1)}d remaining"
+            return f"{round(total_seconds / 86400, 1)}d"
     except:
-        return "Permanent (No Expiration)"
+        return T["forever"]
 
 # Helper to pull numeric values from item text strings safely
 def extract_numeric_price(price_str):
@@ -95,13 +220,13 @@ def extract_numeric_price(price_str):
 
 # Helper to compute exact final sales prices strings with percentage markup
 def calculate_sale_display(base_val, sale_mode, pct_off):
-    if sale_mode == "Make Free":
-        return "Free (100% OFF)"
-    if pct_off == 100:
-        return "Free (100% OFF)"
+    if sale_mode in ["Make Free", "Zdarma"] or pct_off == 100:
+        return "Free (100% OFF)" if lang == "English" else "Zdarma (100% SLEVA)"
     clean_base = extract_numeric_price(base_val)
     final_num = round(clean_base * (1 - pct_off / 100))
-    return f"{final_num} Diamonds ({pct_off}% OFF)"
+    suffix = "Diamonds" if lang == "English" else "Diamantů"
+    off_suffix = "OFF" if lang == "English" else "SLEVA"
+    return f"{final_num} {suffix} ({pct_off}% {off_suffix})"
 
 # Initialize dataframes into session state if not already done
 if "df_users" not in st.session_state:
@@ -119,7 +244,6 @@ if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
     now_str = datetime.now().isoformat()
     expires_str_series = df_trades_current["expires_at"].astype(str).str.strip()
     
-    # Filter out trades that have expired, but preserve empty strings, nan, or "Permanent"
     valid_trades = df_trades_current[
         (df_trades_current["expires_at"].isna()) | 
         (expires_str_series == "") | 
@@ -131,25 +255,29 @@ if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
         st.session_state.df_trades = valid_trades
         save_sheet_data(valid_trades, "trades")
 
+# ─── REFRESH ACTION BUTTON ────────────────────────────────────────
+if st.button(T["refresh_btn"], use_container_width=True):
+    st.session_state.df_trades = get_sheet_data("trades")
+    st.rerun()
+
 # ─── SIDEBAR AUTHENTICATION ────────────────────────────────────────
-st.sidebar.header("User Authentication")
+st.sidebar.header(T["auth_header"])
 if st.session_state.current_user is None:
-    auth_action = st.sidebar.radio("Choose Action", ["Login", "Register"])
-    auth_user = st.sidebar.text_input("Username").strip().lower()
-    auth_pass = st.sidebar.text_input("Password", type="password")
+    auth_action = st.sidebar.radio(T["choose_action"], [T["login"], T["register"]])
+    auth_user = st.sidebar.text_input(T["username"]).strip().lower()
+    auth_pass = st.sidebar.text_input(T["password"], type="password")
     
-    if auth_action == "Login":
-        if st.sidebar.button("Login"):
+    if auth_action == T["login"]:
+        if st.sidebar.button(T["login"]):
             df = st.session_state.df_users
             user_row = df[df['username'].astype(str).str.strip().str.lower() == auth_user]
             if not user_row.empty and str(user_row.iloc[0]['password']).strip() == str(auth_pass).strip():
                 st.session_state.current_user = auth_user
-                st.sidebar.success(f"Logged in as {auth_user}")
                 st.rerun()
             else:
                 st.sidebar.error("Invalid credentials.")
     else:
-        if st.sidebar.button("Register"):
+        if st.sidebar.button(T["register"]):
             df = st.session_state.df_users
             if not auth_user or not auth_pass:
                 st.sidebar.error("Fields cannot be empty.")
@@ -159,72 +287,80 @@ if st.session_state.current_user is None:
                 new_user = pd.DataFrame([{"username": auth_user, "password": auth_pass}])
                 st.session_state.df_users = pd.concat([df, new_user], ignore_index=True)
                 save_sheet_data(st.session_state.df_users, "users")
-                st.sidebar.success(f"Registered {auth_user}! Please log in.")
                 st.rerun()
 else:
     st.sidebar.success(f"Logged in as: **{st.session_state.current_user}**")
-    if st.sidebar.button("Logout"):
+    if st.sidebar.button(T["logout"]):
         st.session_state.current_user = None
         st.rerun()
 
 # ─── MAIN TABS INTERFACE ──────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["🛒 Trade Store", "📜 Case Records", "⚡ Teleport Tracker"])
+tab1, tab2, tab3 = st.tabs(T["tabs"])
 
 # ==========================================
 # TAB 1: TRADE STORE
 # ==========================================
 with tab1:
-    st.header("Server Marketplace")
+    st.header(T["marketplace"])
     df_trades = st.session_state.df_trades
     
     if st.session_state.current_user:
-        with st.expander("➕ Create Listing (Sale / Sale Delay / Auction)"):
-            item = st.text_input("Item Name")
-            is_enchantable = st.checkbox("Enchantable?")
+        with st.expander(T["create_listing"]):
+            # ITEM SELECTOR WITH SMART PRICE SUGGESTION
+            selected_item_key = st.selectbox(T["item_name"], list(PRICE_SUGGESTIONS.keys()))
+            
+            if selected_item_key == "Custom Item / Jiný předmět":
+                final_item_name = st.text_input(T["custom_item"])
+                suggested_val = 10
+            else:
+                final_item_name = selected_item_key
+                suggested_val = PRICE_SUGGESTIONS[selected_item_key]
+                st.caption(f"{T['suggested']} **{suggested_val} {T['diamonds']}**")
+                
+            is_enchantable = st.checkbox(T["enchantable"])
             enchants = []
             if is_enchantable:
-                text_input = st.text_input("Enchants (comma separated)")
+                text_input = st.text_input(T["enchants_placeholder"])
                 enchants = [e.strip() for e in text_input.split(",") if e.strip()]
             
-            listing_type = st.radio("Listing Format", ["Standard Fix Price", "Auction (Bidding)"])
+            listing_type = st.radio(T["format"], [T["fixed_price"], T["auction_format"]])
             
-            st.markdown("##### Duration Settings")
-            is_permanent = st.checkbox("Stay Forever (No Expiration Timer)", value=False)
+            st.markdown(T["duration_settings"])
+            is_permanent = st.checkbox(T["stay_forever"], value=False)
             
             duration_amount = 2
-            duration_unit = "Hours"
+            duration_unit = "Hours" if lang == "English" else "Hodiny"
             if not is_permanent:
                 col_dur, col_unit = st.columns([2, 2])
                 with col_dur:
-                    duration_amount = st.number_input("Time Amount", min_value=1, value=2)
+                    duration_amount = st.number_input(T["time_amount"], min_value=1, value=2)
                 with col_unit:
-                    duration_unit = st.selectbox("Time Unit", ["Minutes", "Hours", "Days"], index=1)
+                    duration_unit = st.selectbox(T["time_unit"], ["Minutes", "Hours", "Days"] if lang == "English" else ["Minuty", "Hodiny", "Dny"], index=1)
                 
-            if listing_type == "Standard Fix Price":
-                base_price_val = st.number_input("Base Price (Diamonds)", min_value=1, value=10)
+            if listing_type == T["fixed_price"]:
+                base_price_val = st.number_input(T["base_price"], min_value=1, value=suggested_val if suggested_val > 0 else 10)
                 
-                # ADVANCED DELAYED SALE CONFIG
-                has_delayed_sale = st.checkbox("Schedule a future discount sale?")
+                has_delayed_sale = st.checkbox(T["sched_sale"])
                 sale_price_val = ""
                 sale_at_val = ""
                 if has_delayed_sale:
-                    st.markdown("##### Advanced Scheduled Sale")
-                    sale_mode = st.radio("Discount Type", ["Percentage Off (1-100%)", "Make Free"], key="sched_mode")
+                    st.markdown(T["adv_sale_header"])
+                    sale_mode = st.radio(T["discount_type"], [T["pct_off_label"], T["make_free_label"]], key="sched_mode")
                     
                     discount_pct = 0
-                    if sale_mode == "Percentage Off (1-100%)":
-                        discount_pct = st.slider("Select Discount %", min_value=1, max_value=100, value=20, key="sched_pct")
+                    if sale_mode == T["pct_off_label"]:
+                        discount_pct = st.slider("Select %", min_value=1, max_value=100, value=20, key="sched_pct")
                     else:
                         discount_pct = 100
                     
                     calculated_price = calculate_sale_display(base_price_val, sale_mode, discount_pct)
-                    st.info(f"📊 **Sale Preview:** Price will drop from {base_price_val} Diamonds to **{calculated_price}**")
+                    st.info(T["preview"].format(base_price_val, calculated_price))
                     
                     col_sdur, col_sunit = st.columns([2, 2])
                     with col_sdur:
-                        delay_amount = st.number_input("Delay Time Amount", min_value=1, value=30, key="sched_amt")
+                        delay_amount = st.number_input(T["time_amount"], min_value=1, value=30, key="sched_amt")
                     with col_sunit:
-                        delay_unit = st.selectbox("Delay Time Unit", ["Minutes", "Hours", "Days"], key="sched_unit")
+                        delay_unit = st.selectbox(T["time_unit"], ["Minutes", "Hours", "Days"] if lang == "English" else ["Minuty", "Hodiny", "Dny"], key="sched_unit")
                         
                     sale_price_val = calculated_price
                     sale_at_val = (datetime.now() + calculate_delta(delay_amount, delay_unit)).isoformat()
@@ -232,21 +368,21 @@ with tab1:
                 price_string = f"{base_price_val} Diamonds"
                 is_auction_val = False
             else:
-                base_price_val = st.number_input("Starting Bid Price (Diamonds)", min_value=1, value=5)
+                base_price_val = st.number_input(T["start_bid"], min_value=1, value=suggested_val if suggested_val > 0 else 5)
                 price_string = f"Starting bid: {base_price_val} Diamonds"
                 sale_price_val = ""
                 sale_at_val = ""
                 is_auction_val = True
             
-            if st.button("Publish Listing"):
-                if item:
+            if st.button(T["publish"]):
+                if final_item_name:
                     next_id = int(df_trades["id"].max() + 1) if not df_trades.empty and 'id' in df_trades.columns else 1
                     exp_time = "Permanent" if is_permanent else (datetime.now() + calculate_delta(duration_amount, duration_unit)).isoformat()
                     
                     new_trade = pd.DataFrame([{
                         "id": next_id,
                         "seller": st.session_state.current_user,
-                        "item": item,
+                        "item": final_item_name,
                         "enchants": str(enchants),
                         "price": price_string,
                         "created_at": datetime.now().isoformat(),
@@ -259,17 +395,12 @@ with tab1:
                     }])
                     st.session_state.df_trades = pd.concat([df_trades, new_trade], ignore_index=True)
                     save_sheet_data(st.session_state.df_trades, "trades")
-                    st.success("Market listing added successfully!")
+                    st.success("Success!")
                     st.rerun()
-                else:
-                    st.error("Item name is required.")
                     
-    else:
-        st.info("Log in to list items on the market.")
-
-    st.subheader("Active Listings")
+    st.subheader(T["active_listings"])
     if df_trades.empty or 'item' not in df_trades.columns:
-        st.write("No items on sale right now.")
+        st.write(T["no_items"])
     else:
         now_str = datetime.now().isoformat()
         for idx, row in df_trades.iterrows():
@@ -300,89 +431,65 @@ with tab1:
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                # Expiration read text display
                 exp_status = format_time_remaining(row.get('expires_at'))
-                if exp_status == "Permanent a No Expiration" or "Permanent" in exp_status:
-                    st.caption("⏳ **Time left: Stay Forever**")
-                else:
-                    st.caption(f"⏳ Time left: {exp_status}")
+                st.caption(T["time_left"].format(exp_status))
             
             with col2:
                 is_admin = st.session_state.current_user == "admin"
                 is_seller = st.session_state.current_user == row.get('seller', '')
                 is_item_auction = str(row.get('is_auction')) == "True" or row.get('is_auction') is True
                 
-                # --- AUCTION ACTION CONNECTIONS ---
                 if is_item_auction and st.session_state.current_user:
                     if st.session_state.current_user != row['seller']:
                         min_bid = int(row['highest_bid']) + 1
-                        bid_amount = st.number_input(f"Bid (Min {min_bid})", min_value=min_bid, step=1, key=f"bid_val_{row['id']}")
-                        if st.button("🔨 Place Bid", key=f"bid_btn_{row['id']}"):
+                        bid_amount = st.number_input(T["bid_min"].format(min_bid), min_value=min_bid, step=1, key=f"bid_val_{row['id']}")
+                        if st.button(T["place_bid"], key=f"bid_btn_{row['id']}"):
                             df_trades.at[idx, 'highest_bid'] = bid_amount
                             df_trades.at[idx, 'highest_bidder'] = st.session_state.current_user
                             st.session_state.df_trades = df_trades
                             save_sheet_data(df_trades, "trades")
-                            st.success("You are the highest bidder!")
                             st.rerun()
                 
-                # --- PORTAL TO MODIFY OR REMOVE SALES ---
                 if not is_item_auction and (is_seller or is_admin):
-                    # 1. NEW COMPONENT: EXPIRATION MANAGEMENT FOR LIVE ITEMS
-                    with st.expander("⏳ Manage Expiration"):
-                        mod_perm = st.checkbox("Make Permanent (Stay Forever)", value=("Permanent" in exp_status or pd.isna(row.get('expires_at')) or str(row.get('expires_at')) == ""), key=f"mod_perm_{row['id']}")
-                        
+                    # Manage Expiration
+                    with st.expander(T["manage_exp"]):
+                        mod_perm = st.checkbox(T["stay_forever"], value=("Permanent" in exp_status or pd.isna(row.get('expires_at')) or str(row.get('expires_at')) == ""), key=f"mod_perm_{row['id']}")
                         if not mod_perm:
                             col_m_amt, col_m_unit = st.columns(2)
                             with col_m_amt:
-                                mod_amount = st.number_input("Add Time", min_value=1, value=10, key=f"mod_amt_{row['id']}")
+                                mod_amount = st.number_input(T["time_amount"], min_value=1, value=10, key=f"mod_amt_{row['id']}")
                             with col_m_unit:
-                                mod_unit = st.selectbox("Unit", ["Minutes", "Hours", "Days"], index=1, key=f"mod_unit_{row['id']}")
-                        
-                        if st.button("Update Expiration", key=f"mod_exp_btn_{row['id']}"):
-                            if mod_perm:
-                                df_trades.at[idx, 'expires_at'] = "Permanent"
-                            else:
-                                df_trades.at[idx, 'expires_at'] = (datetime.now() + calculate_delta(mod_amount, mod_unit)).isoformat()
+                                mod_unit = st.selectbox(T["time_unit"], ["Minutes", "Hours", "Days"] if lang == "English" else ["Minuty", "Hodiny", "Dny"], index=1, key=f"mod_unit_{row['id']}")
+                        if st.button(T["update_exp"], key=f"mod_exp_btn_{row['id']}"):
+                            df_trades.at[idx, 'expires_at'] = "Permanent" if mod_perm else (datetime.now() + calculate_delta(mod_amount, mod_unit)).isoformat()
                             st.session_state.df_trades = df_trades
                             save_sheet_data(df_trades, "trades")
-                            st.success("Timer updated successfully!")
                             st.rerun()
 
-                    # 2. Existing Advanced Sales Interface Form Block
+                    # Trigger Sale Interface
                     if has_any_sale_configured:
-                        if st.button("🏷️ Remove Sale", key=f"rm_sale_{row['id']}", help="Wipes discount settings and restores base cost"):
+                        if st.button(T["remove_sale"], key=f"rm_sale_{row['id'] concrete}"):
                             df_trades.at[idx, 'sale_price'] = ""
                             df_trades.at[idx, 'sale_at'] = ""
                             st.session_state.df_trades = df_trades
                             save_sheet_data(df_trades, "trades")
-                            st.success("Sale configuration removed!")
                             st.rerun()
                     else:
-                        with st.expander("🏷️ Trigger Sale"):
-                            inst_mode = st.radio("Discount Type", ["Percentage Off", "Make Free"], key=f"inst_mode_{row['id']}")
-                            
-                            inst_pct = 0
-                            if inst_mode == "Percentage Off":
-                                inst_pct = st.slider("Select Cut %", 1, 100, 25, key=f"inst_sld_{row['id']}")
-                            else:
-                                inst_pct = 100
-                            
+                        with st.expander(T["trigger_sale"]):
+                            inst_mode = st.radio(T["discount_type"], [T["pct_off_label"], T["make_free_label"]], key=f"inst_mode_{row['id']}")
+                            inst_pct = st.slider("Select %", 1, 100, 25, key=f"inst_sld_{row['id']}") if inst_mode == T["pct_off_label"] else 100
                             preview_price = calculate_sale_display(row['price'], inst_mode, inst_pct)
-                            st.caption(f"Will change price to: **{preview_price}**")
-                            
-                            if st.button("Apply Sale Now", key=f"inst_btn_{row['id']}"):
+                            if st.button(T["apply_now"], key=f"inst_btn_{row['id']}"):
                                 df_trades.at[idx, 'sale_price'] = preview_price
                                 df_trades.at[idx, 'sale_at'] = datetime.now().isoformat()
                                 st.session_state.df_trades = df_trades
                                 save_sheet_data(df_trades, "trades")
-                                st.success("Discount Applied Live!")
                                 st.rerun()
 
                 if is_admin or is_seller:
-                    if st.button("❌ Remove Listing", key=f"del_trade_{row['id']}"):
+                    if st.button(T["remove_listing"], key=f"del_trade_{row['id']}"):
                         st.session_state.df_trades = df_trades.drop(idx)
                         save_sheet_data(st.session_state.df_trades, "trades")
-                        st.success("Listing removed!")
                         st.rerun()
             st.divider()
 
@@ -390,18 +497,18 @@ with tab1:
 # TAB 2: CASE RECORDS
 # ==========================================
 with tab2:
-    st.header("Punishment Case Management")
-    st.info("Note: Case tracking functionality is held in app cache.")
+    st.header(T["tabs"][1])
+    st.info("Held in temporary cache.")
 
 # ==========================================
-# TAB 3: TELEPORT TRACKER (ADMIN CONTROLLED)
+# TAB 3: TELEPORT TRACKER
 # ==========================================
 with tab3:
-    st.header("Daily Teleport (TP) Tracker")
-    st.info(f"Today's Date Reference: **{TODAY}**")
+    st.header(T["tabs"][2])
+    st.info(f"Date: {TODAY}")
     
     df_tps = st.session_state.df_tps
-    tp_username = st.text_input("Enter Minecraft Username to track/use", key="tp_user_input").strip().lower()
+    tp_username = st.text_input("Minecraft Username", key="tp_user_input").strip().lower()
     
     if tp_username and not df_tps.empty and 'username' in df_tps.columns:
         df_tps['username_clean'] = df_tps['username'].astype(str).str.strip().str.lower()
@@ -416,29 +523,26 @@ with tab3:
         else:
             current_tps = int(user_tp_row.iloc[0]['remaining_tps'])
             
-        st.metric(label=f"Remaining TPs for {tp_username}", value=f"{current_tps} / {MAX_TPS}")
+        st.metric(label=f"Remaining TPs: {tp_username}", value=f"{current_tps} / {MAX_TPS}")
         
         if st.session_state.current_user == "admin":
             col_use, col_reset = st.columns(2)
             user_idx = df_tps[df_tps['username_clean'] == tp_username].index[0]
             
             with col_use:
-                if st.button("⚡ Use 1 Teleport", key="btn_use_tp"):
-                    if current_tps <= 0:
-                        st.error(f"💀 {tp_username} has NO TPs left today!")
-                    else:
+                if st.button("⚡ Use 1 TP", key="btn_use_tp"):
+                    if current_tps > 0:
                         df_tps.at[user_idx, 'remaining_tps'] = current_tps - 1
                         st.session_state.df_tps = df_tps
                         save_sheet_data(df_tps, "tps")
-                        st.success(f"Teleport tracked for {tp_username}!")
                         st.rerun()
-                        
             with col_reset:
-                if st.button("🔄 Admin Reset to Full", key="btn_reset_tp"):
+                if st.button("🔄 Reset TPs", key="btn_reset_tp"):
                     df_tps.at[user_idx, 'remaining_tps'] = MAX_TPS
                     st.session_state.df_tps = df_tps
                     save_sheet_data(df_tps, "tps")
-                    st.success(f"Reset completed for {tp_username}!")
                     st.rerun()
-        else:
-            st.warning("⚠️ Only the admin account can adjust or log teleport usages.")
+
+# ─── TIMED BACKEND AUTO-REFRESH SCRIPT ───────────────────────────
+# Forces Streamlit backend thread to wake up and sync clock objects periodically
+st.fragment(run_every=30)(lambda: None)()
