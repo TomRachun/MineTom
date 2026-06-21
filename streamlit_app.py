@@ -83,6 +83,24 @@ def format_time_remaining(target_iso):
     except:
         return "Unknown time"
 
+# Helper to pull numeric values from item text strings safely
+def extract_numeric_price(price_str):
+    try:
+        clean_num = int(''.join(filter(str.isdigit, str(price_str))))
+        return clean_num
+    except:
+        return 0
+
+# Helper to compute exact final sales prices strings
+def calculate_sale_display(base_val, sale_mode, pct_off):
+    if sale_mode == "Make Free":
+        return "Free"
+    if pct_off == 100:
+        return "Free"
+    clean_base = extract_numeric_price(base_val)
+    final_num = round(clean_base * (1 - pct_off / 100))
+    return f"{final_num} Diamonds"
+
 # Initialize dataframes into session state if not already done
 if "df_users" not in st.session_state:
     st.session_state.df_users = get_sheet_data("users")
@@ -159,7 +177,6 @@ with tab1:
             
             listing_type = st.radio("Listing Format", ["Standard Fix Price", "Auction (Bidding)"])
             
-            # --- CUSTOM DURATION UNITS CONTROLS ---
             st.markdown("##### Duration Settings")
             col_dur, col_unit = st.columns([2, 2])
             with col_dur:
@@ -168,28 +185,31 @@ with tab1:
                 duration_unit = st.selectbox("Time Unit", ["Minutes", "Hours", "Days"], index=1)
                 
             if listing_type == "Standard Fix Price":
-                # Price logic
                 base_price_val = st.number_input("Base Price (Diamonds)", min_value=1, value=10)
                 
-                # Discount setup with dynamic intervals
+                # ADVANCED DELAYED SALE CONFIG
                 has_delayed_sale = st.checkbox("Schedule a future discount sale?")
                 sale_price_val = ""
                 sale_at_val = ""
                 if has_delayed_sale:
-                    st.markdown("##### Delayed Sale Configuration")
+                    st.markdown("##### Advanced Scheduled Sale")
+                    sale_mode = st.radio("Discount Type", ["Percentage Off (1-100%)", "Make Free"], key="sched_mode")
+                    
+                    discount_pct = 0
+                    if sale_mode == "Percentage Off (1-100%)":
+                        discount_pct = st.slider("Select Discount %", min_value=1, max_value=100, value=20, key="sched_pct")
+                    
+                    # Live Preview Output before saving
+                    calculated_price = calculate_sale_display(base_price_val, sale_mode, discount_pct)
+                    st.info(f"📊 **Sale Preview:** Price will drop from {base_price_val} Diamonds to **{calculated_price}**")
+                    
                     col_sdur, col_sunit = st.columns([2, 2])
                     with col_sdur:
-                        delay_amount = st.number_input("Delay Time Amount", min_value=1, value=30)
+                        delay_amount = st.number_input("Delay Time Amount", min_value=1, value=30, key="sched_amt")
                     with col_sunit:
-                        delay_unit = st.selectbox("Delay Time Unit", ["Minutes", "Hours", "Days"], key="delay_unit_sel")
+                        delay_unit = st.selectbox("Delay Time Unit", ["Minutes", "Hours", "Days"], key="sched_unit")
                         
-                    discount_pct = st.slider("Discount percentage (%)", min_value=5, max_value=95, value=20)
-                    # Clean clean numeric calculations strings
-                    try:
-                        clean_num = int(''.join(filter(str.isdigit, str(base_price_val))))
-                    except:
-                        clean_num = 10
-                    sale_price_val = f"{round(clean_num * (1 - discount_pct/100))} Diamonds"
+                    sale_price_val = calculated_price
                     sale_at_val = (datetime.now() + calculate_delta(delay_amount, delay_unit)).isoformat()
                 
                 price_string = f"{base_price_val} Diamonds"
@@ -238,10 +258,11 @@ with tab1:
         for idx, row in df_trades.iterrows():
             col1, col2 = st.columns([4, 2])
             
-            display_price = row.get('price', 'Free')
+            display_price = str(row.get('price', 'Free'))
+            has_any_sale_configured = pd.notna(row.get('sale_at')) and row['sale_at'] != ""
             is_currently_discounted = False
             
-            if pd.notna(row.get('sale_at')) and row['sale_at'] != "":
+            if has_any_sale_configured:
                 if now_str >= str(row['sale_at']):
                     display_price = f"🔥 SALE: {row['sale_price']} (Was {row['price']})"
                     is_currently_discounted = True
@@ -268,9 +289,10 @@ with tab1:
             with col2:
                 is_admin = st.session_state.current_user == "admin"
                 is_seller = st.session_state.current_user == row.get('seller', '')
+                is_item_auction = str(row.get('is_auction')) == "True" or row.get('is_auction') is True
                 
-                # --- ACTION INTERFACE FOR CURRENT ACTIVE ITEMS ---
-                if (str(row.get('is_auction')) == "True" or row.get('is_auction') is True) and st.session_state.current_user:
+                # --- AUCTION ACTION CONNECTIONS ---
+                if is_item_auction and st.session_state.current_user:
                     if st.session_state.current_user != row['seller']:
                         min_bid = int(row['highest_bid']) + 1
                         bid_amount = st.number_input(f"Bid (Min {min_bid})", min_value=min_bid, step=1, key=f"bid_val_{row['id']}")
@@ -282,21 +304,37 @@ with tab1:
                             st.success("You are the highest bidder!")
                             st.rerun()
                 
-                # --- DISCOUNT PORTAL FOR OWNERS ON ACTIVE ITEMS ---
-                elif not is_auction_val and (is_seller or is_admin) and not is_currently_discounted:
-                    with st.expander("🏷️ Trigger Sale"):
-                        instant_discount = st.slider("Sale Cut %", 5, 95, 25, key=f"inst_sld_{row['id']}")
-                        if st.button("Apply Sale Now", key=f"inst_btn_{row['id']}"):
-                            try:
-                                clean_num = int(''.join(filter(str.isdigit, str(row['price']))))
-                            except:
-                                clean_num = 10
-                            df_trades.at[idx, 'sale_price'] = f"{round(clean_num * (1 - instant_discount/100))} Diamonds"
-                            df_trades.at[idx, 'sale_at'] = datetime.now().isoformat()
+                # --- PORTAL TO MODIFY OR REMOVE SALES ---
+                if not is_item_auction and (is_seller or is_admin):
+                    # Show Remove Sale button if one is configured/active
+                    if has_any_sale_configured:
+                        if st.button("🏷️ Remove Sale", key=f"rm_sale_{row['id']}", help="Wipes discount settings and restores base cost"):
+                            df_trades.at[idx, 'sale_price'] = ""
+                            df_trades.at[idx, 'sale_at'] = ""
                             st.session_state.df_trades = df_trades
                             save_sheet_data(df_trades, "trades")
-                            st.success("Discount Applied Live!")
+                            st.success("Sale configuration removed!")
                             st.rerun()
+                    else:
+                        # Advanced Live Instant Sale Form
+                        with st.expander("🏷️ Trigger Sale"):
+                            inst_mode = st.radio("Discount Type", ["Percentage Off", "Make Free"], key=f"inst_mode_{row['id']}")
+                            
+                            inst_pct = 0
+                            if inst_mode == "Percentage Off":
+                                inst_pct = st.slider("Select Cut %", 1, 100, 25, key=f"inst_sld_{row['id']}")
+                            
+                            # Real-time calculation preview
+                            preview_price = calculate_sale_display(row['price'], inst_mode, inst_pct)
+                            st.caption(f"Will change price to: **{preview_price}**")
+                            
+                            if st.button("Apply Sale Now", key=f"inst_btn_{row['id']}"):
+                                df_trades.at[idx, 'sale_price'] = preview_price
+                                df_trades.at[idx, 'sale_at'] = datetime.now().isoformat()
+                                st.session_state.df_trades = df_trades
+                                save_sheet_data(df_trades, "trades")
+                                st.success("Discount Applied Live!")
+                                st.rerun()
 
                 if is_admin or is_seller:
                     if st.button("❌ Remove Listing", key=f"del_trade_{row['id']}"):
