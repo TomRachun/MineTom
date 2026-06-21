@@ -125,8 +125,9 @@ LOCALES = {
         "code_table_cols": ["Code", "Creator", "Discount", "Scope / IDs", "Banned Items", "Max Uses"],
         "code_success": "✅ Code Applied! Price updated.",
         "code_already_used": "⚠️ You have reached the usage limit for this code!",
-        "code_banned_expl": "🚫 Banned Item List for Code (Comma Separated)",
-        "code_blocked_msg": "🚫 Code blocked! This item is blacklisted by the shop owner."
+        "code_banned_expl": "🚫 Banned Item Names or Listing IDs (Comma Separated)",
+        "code_blocked_msg": "🚫 Code blocked! This item or listing ID is blacklisted by the shop owner.",
+        "not_owned_err": "⚠️ Security Alert: You cannot blacklist Listing IDs that you do not own!"
     },
     "Čeština": {
         "title": "⛏️ Minecraft Server Portál Správy",
@@ -187,8 +188,9 @@ LOCALES = {
         "code_table_cols": ["Kód", "Tvůrce", "Sleva", "Rozsah", "Zakázané Položky", "Max Použití"],
         "code_success": "✅ Kód uplatněn! Cena byla upravena.",
         "code_already_used": "⚠️ Dosáhl jsi limitu použití tohoto kódu!",
-        "code_banned_expl": "🚫 Seznam zakázaných předmětů pro kód (oddělený čárkou)",
-        "code_blocked_msg": "🚫 Kód zablokován! Tento předmět je majitelem na černé listině."
+        "code_banned_expl": "🚫 Zakázané názvy předmětů nebo ID nabídek (oddělené čárkou)",
+        "code_blocked_msg": "🚫 Kód zablokován! Tento předmět nebo ID nabídky je majitelem na černé listině.",
+        "not_owned_err": "⚠️ Bezpečnostní upozornění: Nemůžete zablokovat ID nabídek, které nevlastníte!"
     }
 }
 
@@ -280,15 +282,6 @@ def extract_numeric_price(price_str):
     except:
         return 0
 
-def calculate_sale_display(base_val, sale_mode, pct_off):
-    if sale_mode in ["Make Free", "Zdarma"] or pct_off == 100:
-        return "Free (100% OFF)" if lang == "English" else "Zdarma (100% SLEVA)"
-    clean_base = extract_numeric_price(base_val)
-    final_num = round(clean_base * (1 - pct_off / 100))
-    suffix = "Diamonds" if lang == "English" else "Diamantů"
-    off_suffix = "OFF" if lang == "English" else "SLEVA"
-    return f"{final_num} {suffix} ({pct_off}% {off_suffix})"
-
 # Initialize structures
 if "df_users" not in st.session_state:
     st.session_state.df_users = get_sheet_data("users")
@@ -348,7 +341,6 @@ else:
         st.session_state.current_user = None
         st.rerun()
 
-# ─── COMPONENT FIX: LOAD DYNAMICALLY FROM LOCALIZATION DICTIONARY ───
 tab1, tab2, tab3, tab4 = st.tabs(T["tabs"])
 
 # ==========================================
@@ -429,6 +421,7 @@ with tab1:
             col1, col2 = st.columns([4, 2])
             display_price = str(row.get('price', 'Free'))
             item_name_lower = str(row.get('item', '')).lower()
+            row_id_str = str(row.get('id', '')).strip()
             
             code_success_msg = None
             if global_promo_input and not df_codes.empty:
@@ -442,10 +435,13 @@ with tab1:
                     if not df_claimed.empty and "code" in df_claimed.columns:
                         times_used = len(df_claimed[(df_claimed['username'].astype(str) == str(st.session_state.current_user)) & (df_claimed['code'].astype(str).str.upper() == global_promo_input)])
                     
+                    # Enhanced Blacklist Logic (Matches strings OR exact Listing IDs)
                     is_banned = False
                     if pd.notna(code_row.get('banned_items')) and str(code_row.get('banned_items')).strip():
-                        for k in [bk.strip().lower() for bk in str(code_row['banned_items']).split(",") if bk.strip()]:
-                            if k in item_name_lower: is_banned = True
+                        banned_tokens = [bk.strip().lower() for bk in str(code_row['banned_items']).split(",") if bk.strip()]
+                        for token in banned_tokens:
+                            if token == row_id_str or token in item_name_lower:
+                                is_banned = True
 
                     if is_banned:
                         code_success_msg = "BLOCKED_BLACKLIST"
@@ -572,11 +568,12 @@ with tab3:
                         st.rerun()
 
 # ==========================================
-# TAB 4: CODES / SLEVOVÉ KÓDY
+# TAB 4: CODES / SLEVOVÉ KÓDY (WITH OWNERSHIP PROTECTION)
 # ==========================================
 with tab4:
     st.header(T["code_header"])
     df_codes = st.session_state.df_codes
+    df_trades = st.session_state.df_trades
     is_admin = st.session_state.current_user == "admin"
     
     if st.session_state.current_user:
@@ -589,15 +586,34 @@ with tab4:
             if selected_scope == T["scope_choose_one"]: target_ids_val = "CHOOSE_ONE"
             elif selected_scope == T["scope_specific"]: target_ids_val = st.text_input(T["specific_help"]).strip()
                 
-            banned_items_input = st.text_input(T["code_banned_expl"])
-            usage_limit = st.slider("Usage Limit per Player" if lang == "English" else "Limit použití na hráče", min_value=1, max_value=3, value=1)
+            banned_items_input = st.text_input(T["code_banned_expl"], help="Enter item names or specific listing IDs separated by commas.")
+            
+            # ─── LIMIT UPGRADE: MAX VALUE NOW 10 ───
+            usage_limit = st.slider("Usage Limit per Player" if lang == "English" else "Limit použití na hráče", min_value=1, max_value=10, value=1)
                 
             if st.button(T["btn_create_code"]):
                 if new_code_str:
-                    new_entry = pd.DataFrame([{"code": new_code_str, "creator": st.session_state.current_user, "discount": code_discount, "target_ids": target_ids_val, "banned_items": banned_items_input.strip(), "max_uses": usage_limit}])
-                    st.session_state.df_codes = pd.concat([df_codes, new_entry], ignore_index=True)
-                    save_sheet_data(st.session_state.df_codes, "codes")
-                    st.rerun()
+                    # ─── ENFORCED SECURITY: CHECK BLACKLIST OWNERSHIP ───
+                    passed_ownership_check = True
+                    banned_tokens = [t.strip() for t in banned_items_input.split(",") if t.strip()]
+                    
+                    for token in banned_tokens:
+                        if token.isdigit():  # It's an ID
+                            target_id = int(token)
+                            # Locate the listing to confirm who owns it
+                            matched_listing = df_trades[df_trades['id'].astype(float) == float(target_id)]
+                            if not matched_listing.empty:
+                                listing_owner = str(matched_listing.iloc[0].get('seller', '')).strip().lower()
+                                if listing_owner != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
+                                    passed_ownership_check = False
+                    
+                    if not passed_ownership_check:
+                        st.error(T["not_owned_err"])
+                    else:
+                        new_entry = pd.DataFrame([{"code": new_code_str, "creator": st.session_state.current_user, "discount": code_discount, "target_ids": target_ids_val, "banned_items": banned_items_input.strip(), "max_uses": usage_limit}])
+                        st.session_state.df_codes = pd.concat([df_codes, new_entry], ignore_index=True)
+                        save_sheet_data(st.session_state.df_codes, "codes")
+                        st.rerun()
                     
         if not df_codes.empty and "code" in df_codes.columns:
             st.dataframe(df_codes, use_container_width=True)
