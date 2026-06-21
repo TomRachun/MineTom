@@ -14,7 +14,6 @@ TODAY = str(date.today())
 
 PRICE_SUGGESTIONS = {
     "Custom Item / Jiný předmět": (0, 1),
-    # ⚔️ High-Tier Gear & Tools
     "Netherite Ingot": (8, 1),
     "Diamond Block": (9, 1),
     "Elytra": (150, 1),
@@ -28,7 +27,6 @@ PRICE_SUGGESTIONS = {
     "Unbreaking III Book": (30, 1),
     "Efficiency V Book": (40, 1),
     "Trident": (80, 1),
-    # 🐾 Animals & Entities
     "Horse (Tamed / High Stats)": (5, 1),
     "Donkey / Mule": (4, 1),
     "Villager (Unemployed)": (6, 1),
@@ -42,7 +40,6 @@ PRICE_SUGGESTIONS = {
     "Frog / Toad": (2, 1),
     "Camel": (6, 1),
     "Sniffer Egg": (8, 1),
-    # 💎 Blocks & Valuables
     "Enchanted Golden Apple": (10, 1),
     "Golden Apple": (1, 1),
     "Block of Netherite": (72, 1),
@@ -53,7 +50,6 @@ PRICE_SUGGESTIONS = {
     "Glowstone (Stack)": (2, 64),
     "Rocket's x16": (1, 16),
     "Crying Obsidian (Stack)": (3, 64),
-    # 🧪 Brewing & Mob Drops
     "Wither Skeleton Skull": (5, 3),
     "Sponge Block": (2, 1),
     "Blaze Rod (Stack)": (3, 64),
@@ -94,19 +90,11 @@ LOCALES = {
         "time_unit": "Time Unit",
         "base_price": "Base Price (Diamonds)",
         "start_bid": "Starting Bid Price (Diamonds)",
-        "sched_sale": "Schedule a future discount sale?",
-        "adv_sale_header": "##### Advanced Scheduled Sale",
-        "discount_type": "Discount Type",
-        "pct_off_label": "Percentage Off (1-100%)",
-        "make_free_label": "Make Free",
-        "preview": "📊 Sale Preview: Price will drop from {} Diamonds to **{}**",
         "publish": "Publish Listing",
         "active_listings": "Active Listings",
         "global_coupon_label": "🎟️ Apply Promo / Sale Code for Checkout",
         "global_coupon_placeholder": "Enter code (e.g. VOLBA25) and press Enter",
-        "coupon_login_required": "🔒 Please log in to your account to use checkout codes.",
         "no_items": "No items on sale right now.",
-        "time_left": "⏳ Time left: {}",
         "forever": "Stay Forever",
         "remove_listing": "❌ Remove Listing",
         "refresh_btn": "🔄 Force Refresh Data",
@@ -117,12 +105,9 @@ LOCALES = {
         "code_scope": "Code Target Scope",
         "scope_global": "Global (All your items)",
         "scope_choose_one": "Global (Customer chooses 1 item)",
-        "scope_admin_global": "Admin Global (All marketplace items)",
         "scope_specific": "Specific Listing IDs only",
         "specific_help": "Enter comma separated IDs (e.g. 1, 4, 12)",
         "btn_create_code": "Generate Code",
-        "active_codes": "Active Sale Codes",
-        "code_table_cols": ["Code", "Creator", "Discount", "Scope / IDs", "Banned Items", "Max Uses"],
         "code_success": "✅ Code Applied! Price updated.",
         "code_already_used": "⚠️ You have reached the usage limit for this code!",
         "code_banned_expl": "🚫 Banned Item Names or Listing IDs (Comma Separated)",
@@ -157,19 +142,11 @@ LOCALES = {
         "time_unit": "Časová jednotka",
         "base_price": "Základní Cena (Diamanty)",
         "start_bid": "Vyvolávací Cena (Diamanty)",
-        "sched_sale": "Naplánovat budoucí slevu?",
-        "adv_sale_header": "##### Pokročilý Naplánovaný Prodej",
-        "discount_type": "Typ Slevy",
-        "pct_off_label": "Procentuální Sleva (1-100%)",
-        "make_free_label": "Zdarma",
-        "preview": "📊 Náhled slevy: Cena klesne z {} Diamantů na **{}**",
         "publish": "Publikovat Nabídku",
         "active_listings": "Aktivní Nabídky",
         "global_coupon_label": "🎟️ Použít slevový / promo kód pro nákup",
         "global_coupon_placeholder": "Zadejte kód (např. VOLBA25) a stiskněte Enter",
-        "coupon_login_required": "🔒 Pro uplatnění slevových kódů se musíte přihlásit.",
         "no_items": "Momentálně nejsou v nabídce žádné položky.",
-        "time_left": "⏳ Zbývající čas: {}",
         "forever": "Navždy",
         "remove_listing": "❌ Odstranit Nabídku",
         "refresh_btn": "🔄 Vynutit Obnovení Dat",
@@ -180,12 +157,9 @@ LOCALES = {
         "code_scope": "Rozsah Platnosti Kódu",
         "scope_global": "Globální (Všechny moje předměty)",
         "scope_choose_one": "Globální (Zákazník si vybere 1 položku)",
-        "scope_admin_global": "Admin Globální (Všechny předměty na trhu)",
         "scope_specific": "Pouze specifické ID nabídek",
         "specific_help": "Zadejte ID oddělená čárkou (např. 1, 4, 12)",
         "btn_create_code": "Generovat Kód",
-        "active_codes": "Aktivní Slevové Kódy",
-        "code_table_cols": ["Kód", "Tvůrce", "Sleva", "Rozsah", "Zakázané Položky", "Max Použití"],
         "code_success": "✅ Kód uplatněn! Cena byla upravena.",
         "code_already_used": "⚠️ Dosáhl jsi limitu použití tohoto kódu!",
         "code_banned_expl": "🚫 Zakázané názvy předmětů nebo ID nabídek (oddělené čárkou)",
@@ -220,7 +194,6 @@ def get_sheet_data(worksheet_name):
 def save_sheet_data(df, worksheet_name):
     if "gsheets_write_url" not in st.secrets:
         return
-        
     if worksheet_name == "users":
         cols = ["username", "password"]
     elif worksheet_name == "trades":
@@ -234,69 +207,39 @@ def save_sheet_data(df, worksheet_name):
     elif worksheet_name == "orders":
         cols = ["id", "buyer", "item", "target_qty", "current_qty", "reward_diamonds"]
         
-    if "username_clean" in df.columns:
-        df = df.drop(columns=["username_clean"])
-            
     df_save = df.reindex(columns=cols).fillna("")
-    rows_list = df_save.values.tolist()
-    
-    payload = {
-        "action": "clear_and_save",
-        "sheet": worksheet_name,
-        "data": rows_list
-    }
-    try:
-        requests.post(st.secrets["gsheets_write_url"], json=payload)
-    except:
-        pass
+    payload = {"action": "clear_and_save", "sheet": worksheet_name, "data": df_save.values.tolist()}
+    try: requests.post(st.secrets["gsheets_write_url"], json=payload)
+    except: pass
 
 def calculate_delta(amount, unit):
-    if unit in ["Minutes", "Minuty"]:
-        return timedelta(minutes=amount)
-    elif unit in ["Hours", "Hodiny"]:
-        return timedelta(hours=amount)
-    else:
-        return timedelta(days=amount)
+    if unit in ["Minutes", "Minuty"]: return timedelta(minutes=amount)
+    elif unit in ["Hours", "Hodiny"]: return timedelta(hours=amount)
+    else: return timedelta(days=amount)
 
 def format_time_remaining(target_iso):
-    if pd.isna(target_iso) or str(target_iso).strip() in ["", "nan", "Permanent"]:
-        return T["forever"]
+    if pd.isna(target_iso) or str(target_iso).strip() in ["", "nan", "Permanent"]: return T["forever"]
     try:
         delta = datetime.fromisoformat(str(target_iso)) - datetime.now()
         total_seconds = delta.total_seconds()
-        if total_seconds <= 0:
-            return "Expired"
-        if total_seconds < 3600:
-            return f"{round(total_seconds / 60, 1)}m"
-        elif total_seconds < 86400:
-            return f"{round(total_seconds / 3600, 1)}h"
-        else:
-            return f"{round(total_seconds / 86400, 1)}d"
-    except:
-        return T["forever"]
+        if total_seconds <= 0: return "Expired"
+        if total_seconds < 3600: return f"{round(total_seconds / 60, 1)}m"
+        elif total_seconds < 86400: return f"{round(total_seconds / 3600, 1)}h"
+        else: return f"{round(total_seconds / 86400, 1)}d"
+    except: return T["forever"]
 
 def extract_numeric_price(price_str):
-    try:
-        clean_num = int(''.join(filter(str.isdigit, str(price_str))))
-        return clean_num
-    except:
-        return 0
+    try: return int(''.join(filter(str.isdigit, str(price_str))))
+    except: return 0
 
 # Initialize structures
-if "df_users" not in st.session_state:
-    st.session_state.df_users = get_sheet_data("users")
-if "df_trades" not in st.session_state:
-    st.session_state.df_trades = get_sheet_data("trades")
-if "df_codes" not in st.session_state:
-    st.session_state.df_codes = get_sheet_data("codes")
-if "df_claimed" not in st.session_state:
-    st.session_state.df_claimed = get_sheet_data("claimed_codes")
-if "df_tps" not in st.session_state:
-    st.session_state.df_tps = get_sheet_data("tps")
-if "df_orders" not in st.session_state:
-    st.session_state.df_orders = get_sheet_data("orders")
-if "current_user" not in st.session_state:
-    st.session_state.current_user = None
+if "df_users" not in st.session_state: st.session_state.df_users = get_sheet_data("users")
+if "df_trades" not in st.session_state: st.session_state.df_trades = get_sheet_data("trades")
+if "df_codes" not in st.session_state: st.session_state.df_codes = get_sheet_data("codes")
+if "df_claimed" not in st.session_state: st.session_state.df_claimed = get_sheet_data("claimed_codes")
+if "df_tps" not in st.session_state: st.session_state.df_tps = get_sheet_data("tps")
+if "df_orders" not in st.session_state: st.session_state.df_orders = get_sheet_data("orders")
+if "current_user" not in st.session_state: st.session_state.current_user = None
 
 if st.button(T["refresh_btn"], use_container_width=True):
     st.session_state.df_users = get_sheet_data("users")
@@ -326,10 +269,8 @@ if st.session_state.current_user is None:
     else:
         if st.sidebar.button(T["register"]):
             df = st.session_state.df_users
-            if not auth_user or not auth_pass:
-                st.sidebar.error("Fields cannot be empty.")
-            elif auth_user in df['username'].astype(str).str.lower().values:
-                st.sidebar.error("Username already exists.")
+            if not auth_user or not auth_pass: st.sidebar.error("Fields cannot be empty.")
+            elif auth_user in df['username'].astype(str).str.lower().values: st.sidebar.error("Username already exists.")
             else:
                 new_user = pd.DataFrame([{"username": auth_user, "password": auth_pass}])
                 st.session_state.df_users = pd.concat([df, new_user], ignore_index=True)
@@ -337,6 +278,29 @@ if st.session_state.current_user is None:
                 st.rerun()
 else:
     st.sidebar.success(f"Logged in as: **{st.session_state.current_user}**")
+    
+    # ─── PASSWORD MANAGEMENT BLOCK (USER SELF-SERVICE & ADMIN OVERRIDE) ───
+    with st.sidebar.expander("🔑 Password Settings" if lang == "English" else "🔑 Nastavení Hesla"):
+        df_u = st.session_state.df_users
+        if st.session_state.current_user == "admin":
+            st.markdown("**Admin Master Override**")
+            target_player = st.selectbox("Select Player Account", df_u['username'].astype(str).values)
+            new_override_pass = st.text_input("Set New Password for Player", type="password")
+            if st.button("Force Apply Reset"):
+                if new_override_pass:
+                    df_u.loc[df_u['username'].astype(str) == target_player, 'password'] = new_override_pass
+                    st.session_state.df_users = df_u
+                    save_sheet_data(df_u, "users")
+                    st.success(f"Password updated for {target_player}!")
+        else:
+            self_new_pass = st.text_input("Enter New Password", type="password")
+            if st.button("Update My Password"):
+                if self_new_pass:
+                    df_u.loc[df_u['username'].astype(str) == st.session_state.current_user, 'password'] = self_new_pass
+                    st.session_state.df_users = df_u
+                    save_sheet_data(df_u, "users")
+                    st.success("Your password has been changed!")
+                    
     if st.sidebar.button(T["logout"]):
         st.session_state.current_user = None
         st.rerun()
@@ -378,22 +342,16 @@ with tab1:
             duration_unit = "Hours" if lang == "English" else "Hodiny"
             if not is_permanent:
                 col_dur, col_unit = st.columns([2, 2])
-                with col_dur:
-                    duration_amount = st.number_input(T["time_amount"], min_value=1, value=2)
-                with col_unit:
-                    duration_unit = st.selectbox(T["time_unit"], ["Minutes", "Hours", "Days"] if lang == "English" else ["Minuty", "Hodiny", "Dny"], index=1)
+                with col_dur: duration_amount = st.number_input(T["time_amount"], min_value=1, value=2)
+                with col_unit: duration_unit = st.selectbox(T["time_unit"], ["Minutes", "Hours", "Days"] if lang == "English" else ["Minuty", "Hodiny", "Dny"], index=1)
                 
             if listing_type == T["fixed_price"]:
                 base_price_val = st.number_input(T["base_price"], min_value=1, value=suggested_val if suggested_val > 0 else 10)
-                sale_price_val = ""
-                sale_at_val = ""
                 price_string = f"{base_price_val} Diamonds"
                 is_auction_val = False
             else:
                 base_price_val = st.number_input(T["start_bid"], min_value=1, value=suggested_val if suggested_val > 0 else 5)
                 price_string = f"Starting bid: {base_price_val} Diamonds"
-                sale_price_val = ""
-                sale_at_val = ""
                 is_auction_val = True
             
             if st.button(T["publish"]):
@@ -404,8 +362,8 @@ with tab1:
                     new_trade = pd.DataFrame([{
                         "id": next_id, "seller": st.session_state.current_user, "item": final_item_name,
                         "amount": int(item_amount_val), "enchants": str(enchants), "price": price_string,
-                        "created_at": datetime.now().isoformat(), "expires_at": exp_time, "sale_price": sale_price_val,
-                        "sale_at": sale_at_val, "is_auction": is_auction_val, "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
+                        "created_at": datetime.now().isoformat(), "expires_at": exp_time, "sale_price": "",
+                        "sale_at": "", "is_auction": is_auction_val, "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
                     }])
                     st.session_state.df_trades = pd.concat([df_trades, new_trade], ignore_index=True)
                     save_sheet_data(st.session_state.df_trades, "trades")
@@ -435,18 +393,14 @@ with tab1:
                     if not df_claimed.empty and "code" in df_claimed.columns:
                         times_used = len(df_claimed[(df_claimed['username'].astype(str) == str(st.session_state.current_user)) & (df_claimed['code'].astype(str).str.upper() == global_promo_input)])
                     
-                    # Enhanced Blacklist Logic (Matches strings OR exact Listing IDs)
                     is_banned = False
                     if pd.notna(code_row.get('banned_items')) and str(code_row.get('banned_items')).strip():
                         banned_tokens = [bk.strip().lower() for bk in str(code_row['banned_items']).split(",") if bk.strip()]
                         for token in banned_tokens:
-                            if token == row_id_str or token in item_name_lower:
-                                is_banned = True
+                            if token == row_id_str or token in item_name_lower: is_banned = True
 
-                    if is_banned:
-                        code_success_msg = "BLOCKED_BLACKLIST"
-                    elif times_used >= max_allowed:
-                        code_success_msg = "ALREADY_USED"
+                    if is_banned: code_success_msg = "BLOCKED_BLACKLIST"
+                    elif times_used >= max_allowed: code_success_msg = "ALREADY_USED"
                     else:
                         base_num = extract_numeric_price(display_price)
                         display_price = f"✨ {round(base_num * (1 - discount_amt / 100))} Diamonds ({discount_amt}% OFF)"
@@ -467,7 +421,7 @@ with tab1:
             st.divider()
 
 # ==========================================
-# TAB 2: PRODUCTION ORDERS / ZAKÁZKY
+# TAB 2: PRODUCTION ORDERS / ZAKÁZKY (FLEXIBLE INCREMENTS + FIXED CLOSE)
 # ==========================================
 with tab2:
     st.header(lang == "English" and "📜 Production & Delivery Orders Board" or "📜 Zakázky & Objednávky")
@@ -485,26 +439,35 @@ with tab2:
                 save_sheet_data(st.session_state.df_orders, "orders")
                 st.rerun()
 
-    for o_idx, o_row in df_orders.iterrows():
-        st.markdown(f"### 📦 Order #{o_row['id']}: `{o_row['buyer']}`")
-        curr, target = int(o_row['current_qty']), int(o_row['target_qty'])
-        st.progress(min(1.0, curr/target))
-        st.write(f"Status: {curr} / {target} ({max(0, target-curr)} remaining)")
-        
-        if st.session_state.current_user in ["admin", o_row['buyer']]:
-            c_add, c_sub, c_del = st.columns(3)
-            with c_add:
-                if st.button("➕ Add 1", key=f"a_{o_row['id']}"):
-                    df_orders.at[o_idx, 'current_qty'] = min(target, curr + 1)
-                    save_sheet_data(df_orders, "orders"); st.rerun()
-            with c_sub:
-                if st.button("➖ Sub 1", key=f"s_{o_row['id']}"):
-                    df_orders.at[o_idx, 'current_qty'] = max(0, curr - 1)
-                    save_sheet_data(df_orders, "orders"); st.rerun()
-            with c_del:
-                if st.button("❌ Close", key=f"c_{o_row['id']}"):
-                    st.session_state.df_orders = df_orders.drop(o_idx)
-                    save_sheet_data(st.session_state.df_orders, "orders"); st.rerun()
+    # Re-engineered rendering flow using target index lookups to ensure deletions sync flawlessly
+    if df_orders.empty:
+        st.write("No active production orders.")
+    else:
+        for idx in range(len(df_orders)):
+            o_row = df_orders.iloc[idx]
+            order_id = o_row['id']
+            
+            st.markdown(f"### 📦 Order #{order_id}: `{o_row['buyer']}` needs **{o_row['item']}**")
+            curr, target = int(o_row['current_qty']), int(o_row['target_qty'])
+            st.progress(min(1.0, curr/target))
+            st.write(f"Status: {curr} / {target} ({max(0, target-curr)} remaining) | Reward: {o_row['reward_diamonds']} 💎")
+            
+            if st.session_state.current_user in ["admin", o_row['buyer']]:
+                c_val, c_del = st.columns([3, 1])
+                with c_val:
+                    # ─── INCREMENT UPGRADE: CHOOSE CUSTOM VALUE INSTEAD OF ONLY +1 ───
+                    new_curr_input = st.number_input(f"Update Shipped Qty (Order #{order_id})", min_value=0, max_value=target, value=curr, key=f"inp_{order_id}")
+                    if new_curr_input != curr:
+                        st.session_state.df_orders.loc[st.session_state.df_orders['id'] == order_id, 'current_qty'] = new_curr_input
+                        save_sheet_data(st.session_state.df_orders, "orders")
+                        st.rerun()
+                with c_del:
+                    # ─── REMOVAL UPGRADE: CLEAN DATA DELETION TRACKING BY UNIQUE ID ───
+                    if st.button("❌ Close Board", key=f"close_{order_id}", use_container_width=True):
+                        st.session_state.df_orders = st.session_state.df_orders[st.session_state.df_orders['id'] != order_id]
+                        save_sheet_data(st.session_state.df_orders, "orders")
+                        st.rerun()
+            st.divider()
 
 # ==========================================
 # TAB 3: TRACKER & ARRESTS / TRESTY
@@ -568,7 +531,7 @@ with tab3:
                         st.rerun()
 
 # ==========================================
-# TAB 4: CODES / SLEVOVÉ KÓDY (WITH OWNERSHIP PROTECTION)
+# TAB 4: CODES / SLEVOVÉ KÓDY (WITH ADMIN DELETION SUPPORTS)
 # ==========================================
 with tab4:
     st.header(T["code_header"])
@@ -586,25 +549,18 @@ with tab4:
             if selected_scope == T["scope_choose_one"]: target_ids_val = "CHOOSE_ONE"
             elif selected_scope == T["scope_specific"]: target_ids_val = st.text_input(T["specific_help"]).strip()
                 
-            banned_items_input = st.text_input(T["code_banned_expl"], help="Enter item names or specific listing IDs separated by commas.")
-            
-            # ─── LIMIT UPGRADE: MAX VALUE NOW 10 ───
+            banned_items_input = st.text_input(T["code_banned_expl"])
             usage_limit = st.slider("Usage Limit per Player" if lang == "English" else "Limit použití na hráče", min_value=1, max_value=10, value=1)
                 
             if st.button(T["btn_create_code"]):
                 if new_code_str:
-                    # ─── ENFORCED SECURITY: CHECK BLACKLIST OWNERSHIP ───
                     passed_ownership_check = True
                     banned_tokens = [t.strip() for t in banned_items_input.split(",") if t.strip()]
-                    
                     for token in banned_tokens:
-                        if token.isdigit():  # It's an ID
-                            target_id = int(token)
-                            # Locate the listing to confirm who owns it
-                            matched_listing = df_trades[df_trades['id'].astype(float) == float(target_id)]
+                        if token.isdigit():
+                            matched_listing = df_trades[df_trades['id'].astype(float) == float(token)]
                             if not matched_listing.empty:
-                                listing_owner = str(matched_listing.iloc[0].get('seller', '')).strip().lower()
-                                if listing_owner != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
+                                if str(matched_listing.iloc[0].get('seller', '')).strip().lower() != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
                                     passed_ownership_check = False
                     
                     if not passed_ownership_check:
@@ -615,5 +571,17 @@ with tab4:
                         save_sheet_data(st.session_state.df_codes, "codes")
                         st.rerun()
                     
+        # ─── CODE MANAGEMENT VISUAL LIST WITH ADMIN DELETE OPTION ───
         if not df_codes.empty and "code" in df_codes.columns:
-            st.dataframe(df_codes, use_container_width=True)
+            for c_idx, c_row in df_codes.iterrows():
+                col_info, col_act = st.columns([4, 1])
+                with col_info:
+                    st.markdown(f"🎟️ **Code:** `{c_row['code']}` | **Discount:** {c_row['discount']}% | **Creator:** {c_row['creator']}")
+                    st.caption(f"Max Player Uses: {c_row.get('max_uses', 1)} | Banned Targets: {c_row.get('banned_items', 'None')}")
+                with col_act:
+                    if st.session_state.current_user == "admin" or str(c_row.get('creator')).strip().lower() == st.session_state.current_user.lower():
+                        if st.button("❌ Remove Code", key=f"del_code_{c_row['code']}"):
+                            st.session_state.df_codes = df_codes.drop(c_idx)
+                            save_sheet_data(st.session_state.df_codes, "codes")
+                            st.rerun()
+                st.divider()
