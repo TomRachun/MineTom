@@ -179,33 +179,24 @@ if "public_gsheets_url" not in st.secrets:
     st.stop()
 
 base_url = st.secrets["public_gsheets_url"]
-if "/edit" in base_url:
-    base_url = base_url.split("/edit")[0]
-if not base_url.endswith("/"):
-    base_url += "/"
+if "/edit" in base_url: base_url = base_url.split("/edit")[0]
+if not base_url.endswith("/"): base_url += "/"
 
 def get_sheet_data(worksheet_name):
     csv_url = f"{base_url}gviz/tq?tqx=out:csv&sheet={worksheet_name}"
-    try:
-        return pd.read_csv(csv_url)
-    except:
-        return pd.DataFrame()
+    try: return pd.read_csv(csv_url)
+    except: return pd.DataFrame()
 
 def save_sheet_data(df, worksheet_name):
-    if "gsheets_write_url" not in st.secrets:
-        return
-    if worksheet_name == "users":
-        cols = ["username", "password"]
-    elif worksheet_name == "trades":
-        cols = ["id", "seller", "item", "amount", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
-    elif worksheet_name == "codes":
-        cols = ["code", "creator", "discount", "target_ids", "banned_items", "max_uses"]
-    elif worksheet_name == "claimed_codes":
-        cols = ["username", "code"]
-    elif worksheet_name == "tps":
-        cols = ["username", "remaining_tps", "jail_reason", "jail_until"]
-    elif worksheet_name == "orders":
-        cols = ["id", "buyer", "item", "target_qty", "current_qty", "reward_diamonds"]
+    if "gsheets_write_url" not in st.secrets: return
+    if worksheet_name == "users": cols = ["username", "password"]
+    elif worksheet_name == "trades": cols = ["id", "seller", "item", "amount", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
+    elif worksheet_name == "codes": cols = ["code", "creator", "discount", "target_ids", "banned_items", "max_uses"]
+    elif worksheet_name == "claimed_codes": cols = ["username", "code"]
+    elif worksheet_name == "tps": cols = ["username", "remaining_tps"]
+    # ─── UPDATED COLUMNS ACCORDING TO USER'S STRUCTURE MAPPING ───
+    elif worksheet_name == "jail": cols = ["username", "jail_reason", "jail_until"]
+    elif worksheet_name == "orders": cols = ["id", "buyer", "item", "target_qty", "current_qty", "reward_diamonds"]
         
     df_save = df.reindex(columns=cols).fillna("")
     payload = {"action": "clear_and_save", "sheet": worksheet_name, "data": df_save.values.tolist()}
@@ -238,6 +229,7 @@ if "df_trades" not in st.session_state: st.session_state.df_trades = get_sheet_d
 if "df_codes" not in st.session_state: st.session_state.df_codes = get_sheet_data("codes")
 if "df_claimed" not in st.session_state: st.session_state.df_claimed = get_sheet_data("claimed_codes")
 if "df_tps" not in st.session_state: st.session_state.df_tps = get_sheet_data("tps")
+if "df_jail" not in st.session_state: st.session_state.df_jail = get_sheet_data("jail")
 if "df_orders" not in st.session_state: st.session_state.df_orders = get_sheet_data("orders")
 if "current_user" not in st.session_state: st.session_state.current_user = None
 
@@ -248,6 +240,7 @@ if st.button(T["refresh_btn"], use_container_width=True):
     st.session_state.df_claimed = get_sheet_data("claimed_codes")
     st.session_state.df_orders = get_sheet_data("orders")
     st.session_state.df_tps = get_sheet_data("tps")
+    st.session_state.df_jail = get_sheet_data("jail")
     st.rerun()
 
 # Authentication UI
@@ -279,7 +272,6 @@ if st.session_state.current_user is None:
 else:
     st.sidebar.success(f"Logged in as: **{st.session_state.current_user}**")
     
-    # ─── PASSWORD MANAGEMENT BLOCK (USER SELF-SERVICE & ADMIN OVERRIDE) ───
     with st.sidebar.expander("🔑 Password Settings" if lang == "English" else "🔑 Nastavení Hesla"):
         df_u = st.session_state.df_users
         if st.session_state.current_user == "admin":
@@ -421,7 +413,7 @@ with tab1:
             st.divider()
 
 # ==========================================
-# TAB 2: PRODUCTION ORDERS / ZAKÁZKY (FLEXIBLE INCREMENTS + FIXED CLOSE)
+# TAB 2: PRODUCTION ORDERS / ZAKÁZKY
 # ==========================================
 with tab2:
     st.header(lang == "English" and "📜 Production & Delivery Orders Board" or "📜 Zakázky & Objednávky")
@@ -439,7 +431,6 @@ with tab2:
                 save_sheet_data(st.session_state.df_orders, "orders")
                 st.rerun()
 
-    # Re-engineered rendering flow using target index lookups to ensure deletions sync flawlessly
     if df_orders.empty:
         st.write("No active production orders.")
     else:
@@ -455,14 +446,12 @@ with tab2:
             if st.session_state.current_user in ["admin", o_row['buyer']]:
                 c_val, c_del = st.columns([3, 1])
                 with c_val:
-                    # ─── INCREMENT UPGRADE: CHOOSE CUSTOM VALUE INSTEAD OF ONLY +1 ───
                     new_curr_input = st.number_input(f"Update Shipped Qty (Order #{order_id})", min_value=0, max_value=target, value=curr, key=f"inp_{order_id}")
                     if new_curr_input != curr:
                         st.session_state.df_orders.loc[st.session_state.df_orders['id'] == order_id, 'current_qty'] = new_curr_input
                         save_sheet_data(st.session_state.df_orders, "orders")
                         st.rerun()
                 with c_del:
-                    # ─── REMOVAL UPGRADE: CLEAN DATA DELETION TRACKING BY UNIQUE ID ───
                     if st.button("❌ Close Board", key=f"close_{order_id}", use_container_width=True):
                         st.session_state.df_orders = st.session_state.df_orders[st.session_state.df_orders['id'] != order_id]
                         save_sheet_data(st.session_state.df_orders, "orders")
@@ -470,21 +459,22 @@ with tab2:
             st.divider()
 
 # ==========================================
-# TAB 3: TRACKER & ARRESTS / TRESTY
+# TAB 3: TRACKER & ARRESTS / TRESTY 
 # ==========================================
 with tab3:
     st.header(lang == "English" and "⚡ Teleport Tracker & ⚖️ Arrest Record Logs" or "⚡ Tracker portů a ⚖️ Evidence Trestů")
     df_tps = st.session_state.df_tps
+    df_jail = st.session_state.df_jail
     
     st.subheader(lang == "English" and "🕵️ Teleport Quota Checker" or "🕵️ Kontrola kvóty teleportů")
     tp_username = st.text_input(lang == "English" and "Player Minecraft Account Name" or "Minecraft jméno hráče").strip().lower()
     if tp_username:
         if df_tps.empty or 'username' not in df_tps.columns:
-            df_tps = pd.DataFrame(columns=["username", "remaining_tps", "jail_reason", "jail_until"])
+            df_tps = pd.DataFrame(columns=["username", "remaining_tps"])
             
         user_row = df_tps[df_tps['username'].astype(str).str.lower() == tp_username]
         if user_row.empty:
-            new_tp = pd.DataFrame([{"username": tp_username, "remaining_tps": MAX_TPS, "jail_reason": "", "jail_until": ""}])
+            new_tp = pd.DataFrame([{"username": tp_username, "remaining_tps": MAX_TPS}])
             df_tps = pd.concat([df_tps, new_tp], ignore_index=True)
             save_sheet_data(df_tps, "tps")
             curr_tps = MAX_TPS
@@ -504,20 +494,23 @@ with tab3:
             if st.button(lang == "English" and "Execute Arrest Warrant" or "Uplatnit trest"):
                 if jail_user:
                     until_time = (datetime.now() + timedelta(hours=jail_duration)).isoformat()
-                    if not df_tps.empty and jail_user in df_tps['username'].astype(str).str.lower().values:
-                        idx = df_tps[df_tps['username'].astype(str).str.lower() == jail_user].index[0]
-                        df_tps.at[idx, 'jail_reason'] = jail_reason
-                        df_tps.at[idx, 'jail_until'] = until_time
+                    if df_jail.empty or 'username' not in df_jail.columns:
+                        df_jail = pd.DataFrame(columns=["username", "jail_reason", "jail_until"])
+                        
+                    if jail_user in df_jail['username'].astype(str).str.lower().values:
+                        idx = df_jail[df_jail['username'].astype(str).str.lower() == jail_user].index[0]
+                        df_jail.at[idx, 'jail_reason'] = jail_reason
+                        df_jail.at[idx, 'jail_until'] = until_time
                     else:
-                        new_jail = pd.DataFrame([{"username": jail_user, "remaining_tps": MAX_TPS, "jail_reason": jail_reason, "jail_until": until_time}])
-                        df_tps = pd.concat([df_tps, new_jail], ignore_index=True)
-                    st.session_state.df_tps = df_tps
-                    save_sheet_data(df_tps, "tps")
-                    st.success(f"⚖️ {jail_user} configuration updated.")
+                        new_jail = pd.DataFrame([{"username": jail_user, "jail_reason": jail_reason, "jail_until": until_time}])
+                        df_jail = pd.concat([df_jail, new_jail], ignore_index=True)
+                    st.session_state.df_jail = df_jail
+                    save_sheet_data(df_jail, "jail")
+                    st.success(f"⚖️ {jail_user} jailed successfully.")
                     st.rerun()
 
-    if not df_tps.empty and "jail_until" in df_tps.columns:
-        active_jails = df_tps[df_tps['jail_until'].astype(str).str.strip() != ""]
+    if not df_jail.empty and "jail_until" in df_jail.columns:
+        active_jails = df_jail[df_jail['jail_until'].astype(str).str.strip() != ""]
         if not active_jails.empty:
             for j_idx, j_row in active_jails.iterrows():
                 st.warning(f"🔒 **{j_row['username'].upper()}**")
@@ -525,19 +518,18 @@ with tab3:
                 st.caption(f"Remaining: {format_time_remaining(j_row['jail_until'])}")
                 if st.session_state.current_user == "admin":
                     if st.button("Pardon / Release", key=f"unjail_{j_row['username']}"):
-                        df_tps.at[j_idx, 'jail_reason'] = ""
-                        df_tps.at[j_idx, 'jail_until'] = ""
-                        save_sheet_data(df_tps, "tps")
+                        df_jail.at[j_idx, 'jail_reason'] = ""
+                        df_jail.at[j_idx, 'jail_until'] = ""
+                        save_sheet_data(df_jail, "jail")
                         st.rerun()
 
 # ==========================================
-# TAB 4: CODES / SLEVOVÉ KÓDY (WITH ADMIN DELETION SUPPORTS)
+# TAB 4: CODES / SLEVOVÉ KÓDY 
 # ==========================================
 with tab4:
     st.header(T["code_header"])
     df_codes = st.session_state.df_codes
     df_trades = st.session_state.df_trades
-    is_admin = st.session_state.current_user == "admin"
     
     if st.session_state.current_user:
         with st.expander(T["create_code"]):
@@ -560,7 +552,8 @@ with tab4:
                         if token.isdigit():
                             matched_listing = df_trades[df_trades['id'].astype(float) == float(token)]
                             if not matched_listing.empty:
-                                if str(matched_listing.iloc[0].get('seller', '')).strip().lower() != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
+                                listing_owner = str(matched_listing.iloc[0].get('seller', '')).strip().lower()
+                                if listing_owner != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
                                     passed_ownership_check = False
                     
                     if not passed_ownership_check:
@@ -571,17 +564,20 @@ with tab4:
                         save_sheet_data(st.session_state.df_codes, "codes")
                         st.rerun()
                     
-        # ─── CODE MANAGEMENT VISUAL LIST WITH ADMIN DELETE OPTION ───
         if not df_codes.empty and "code" in df_codes.columns:
             for c_idx, c_row in df_codes.iterrows():
-                col_info, col_act = st.columns([4, 1])
-                with col_info:
-                    st.markdown(f"🎟️ **Code:** `{c_row['code']}` | **Discount:** {c_row['discount']}% | **Creator:** {c_row['creator']}")
-                    st.caption(f"Max Player Uses: {c_row.get('max_uses', 1)} | Banned Targets: {c_row.get('banned_items', 'None')}")
-                with col_act:
-                    if st.session_state.current_user == "admin" or str(c_row.get('creator')).strip().lower() == st.session_state.current_user.lower():
-                        if st.button("❌ Remove Code", key=f"del_code_{c_row['code']}"):
-                            st.session_state.df_codes = df_codes.drop(c_idx)
-                            save_sheet_data(st.session_state.df_codes, "codes")
-                            st.rerun()
-                st.divider()
+                creator_lower = str(c_row.get('creator', '')).strip().lower()
+                viewer_lower = st.session_state.current_user.lower()
+                
+                if viewer_lower == "admin" or creator_lower == viewer_lower:
+                    col_info, col_act = st.columns([4, 1])
+                    with col_info:
+                        st.markdown(f"🎟️ **Code:** `{c_row['code']}` | **Discount:** {c_row['discount']}% | **Creator:** {c_row['creator']}")
+                        st.caption(f"Max Player Uses: {c_row.get('max_uses', 1)} | Banned Targets: {c_row.get('banned_items', 'None')}")
+                    with col_act:
+                        if viewer_lower == "admin" or creator_lower == viewer_lower:
+                            if st.button("❌ Remove Code", key=f"del_code_{c_row['code']}"):
+                                st.session_state.df_codes = df_codes.drop(c_idx)
+                                save_sheet_data(st.session_state.df_codes, "codes")
+                                st.rerun()
+                    st.divider()
