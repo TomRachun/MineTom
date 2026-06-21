@@ -58,6 +58,31 @@ def save_sheet_data(df, worksheet_name):
     except Exception as e:
         st.error("Write-back connection failed.")
 
+# Helper to convert dynamic input times to timedelta objects
+def calculate_delta(amount, unit):
+    if unit == "Minutes":
+        return timedelta(minutes=amount)
+    elif unit == "Hours":
+        return timedelta(hours=amount)
+    else:
+        return timedelta(days=amount)
+
+# Helper to easily show human-readable remaining time
+def format_time_remaining(target_iso):
+    try:
+        delta = datetime.fromisoformat(str(target_iso)) - datetime.now()
+        total_seconds = delta.total_seconds()
+        if total_seconds <= 0:
+            return "Expired"
+        if total_seconds < 3600:
+            return f"{round(total_seconds / 60, 1)}m remaining"
+        elif total_seconds < 86400:
+            return f"{round(total_seconds / 3600, 1)}h remaining"
+        else:
+            return f"{round(total_seconds / 86400, 1)}d remaining"
+    except:
+        return "Unknown time"
+
 # Initialize dataframes into session state if not already done
 if "df_users" not in st.session_state:
     st.session_state.df_users = get_sheet_data("users")
@@ -69,11 +94,9 @@ if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
 # ─── AUTOMATIC TIMER CLEANUP ──────────────────────────────────────
-# Clean up expired trades on page load
 df_trades_current = st.session_state.df_trades
 if not df_trades_current.empty and "expires_at" in df_trades_current.columns:
     now_str = datetime.now().isoformat()
-    # Keep rows where expiration is blank OR still in the future
     valid_trades = df_trades_current[(df_trades_current["expires_at"].isna()) | (df_trades_current["expires_at"] == "") | (df_trades_current["expires_at"] > now_str)]
     if len(valid_trades) != len(df_trades_current):
         st.session_state.df_trades = valid_trades
@@ -136,26 +159,43 @@ with tab1:
             
             listing_type = st.radio("Listing Format", ["Standard Fix Price", "Auction (Bidding)"])
             
-            # Form setup depending on options chosen
-            if listing_type == "Standard Fix Price":
-                base_price_val = st.number_input("Base Price (Diamonds)", min_value=1, value=10)
-                duration_hours = st.number_input("Listing Duration (Hours until it expires)", min_value=1, value=48)
+            # --- CUSTOM DURATION UNITS CONTROLS ---
+            st.markdown("##### Duration Settings")
+            col_dur, col_unit = st.columns([2, 2])
+            with col_dur:
+                duration_amount = st.number_input("Time Amount", min_value=1, value=2)
+            with col_unit:
+                duration_unit = st.selectbox("Time Unit", ["Minutes", "Hours", "Days"], index=1)
                 
-                # Discount system
+            if listing_type == "Standard Fix Price":
+                # Price logic
+                base_price_val = st.number_input("Base Price (Diamonds)", min_value=1, value=10)
+                
+                # Discount setup with dynamic intervals
                 has_delayed_sale = st.checkbox("Schedule a future discount sale?")
                 sale_price_val = ""
                 sale_at_val = ""
                 if has_delayed_sale:
-                    delay_hours = st.number_input("Hours before discount activates", min_value=1, value=12)
+                    st.markdown("##### Delayed Sale Configuration")
+                    col_sdur, col_sunit = st.columns([2, 2])
+                    with col_sdur:
+                        delay_amount = st.number_input("Delay Time Amount", min_value=1, value=30)
+                    with col_sunit:
+                        delay_unit = st.selectbox("Delay Time Unit", ["Minutes", "Hours", "Days"], key="delay_unit_sel")
+                        
                     discount_pct = st.slider("Discount percentage (%)", min_value=5, max_value=95, value=20)
-                    sale_price_val = f"{round(base_price_val * (1 - discount_pct/100))} Diamonds"
-                    sale_at_val = (datetime.now() + timedelta(hours=delay_hours)).isoformat()
+                    # Clean clean numeric calculations strings
+                    try:
+                        clean_num = int(''.join(filter(str.isdigit, str(base_price_val))))
+                    except:
+                        clean_num = 10
+                    sale_price_val = f"{round(clean_num * (1 - discount_pct/100))} Diamonds"
+                    sale_at_val = (datetime.now() + calculate_delta(delay_amount, delay_unit)).isoformat()
                 
                 price_string = f"{base_price_val} Diamonds"
                 is_auction_val = False
             else:
                 base_price_val = st.number_input("Starting Bid Price (Diamonds)", min_value=1, value=5)
-                duration_hours = st.number_input("Auction Duration (Hours)", min_value=1, value=24)
                 price_string = f"Starting bid: {base_price_val} Diamonds"
                 sale_price_val = ""
                 sale_at_val = ""
@@ -164,7 +204,7 @@ with tab1:
             if st.button("Publish Listing"):
                 if item:
                     next_id = int(df_trades["id"].max() + 1) if not df_trades.empty and 'id' in df_trades.columns else 1
-                    exp_time = (datetime.now() + timedelta(hours=duration_hours)).isoformat()
+                    exp_time = (datetime.now() + calculate_delta(duration_amount, duration_unit)).isoformat()
                     
                     new_trade = pd.DataFrame([{
                         "id": next_id,
@@ -186,6 +226,7 @@ with tab1:
                     st.rerun()
                 else:
                     st.error("Item name is required.")
+                    
     else:
         st.info("Log in to list items on the market.")
 
@@ -197,21 +238,16 @@ with tab1:
         for idx, row in df_trades.iterrows():
             col1, col2 = st.columns([4, 2])
             
-            # Determine pricing string based on running sales
             display_price = row.get('price', 'Free')
-            is_on_sale = False
+            is_currently_discounted = False
+            
             if pd.notna(row.get('sale_at')) and row['sale_at'] != "":
                 if now_str >= str(row['sale_at']):
                     display_price = f"🔥 SALE: {row['sale_price']} (Was {row['price']})"
-                    is_on_sale = True
+                    is_currently_discounted = True
                 else:
-                    # Convert timestamp back to read time left for sale activation
-                    try:
-                        time_left = datetime.fromisoformat(str(row['sale_at'])) - datetime.now()
-                        hours_left = round(time_left.total_seconds() / 3600, 1)
-                        display_price += f" (Drops to {row['sale_price']} in {hours_left}h)"
-                    except:
-                        pass
+                    time_info = format_time_remaining(row['sale_at'])
+                    display_price += f" (Drops to {row['sale_price']} in {time_info})"
 
             with col1:
                 if str(row.get('is_auction')) == "True" or row.get('is_auction') is True:
@@ -220,22 +256,20 @@ with tab1:
                     if row.get('highest_bidder'):
                         st.markdown(f"Current Bid: **{row['highest_bid']} Diamonds** by `{row['highest_bidder']}`")
                     else:
-                        st.markdown(f"Starting Bid: **{row['highest_bid']} Diamonds** (No bids yet)")
+                        st.markdown(f"Starting Bid: **{row['highest_bid']} Diamonds**")
                 else:
                     st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']}**")
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                # Expiration readout
                 if pd.notna(row.get('expires_at')) and row['expires_at'] != "":
-                    try:
-                        total_left = datetime.fromisoformat(str(row['expires_at'])) - datetime.now()
-                        st.caption(f"⏳ Time left: {round(total_left.total_seconds() / 3600, 1)} hours remaining")
-                    except:
-                        pass
+                    st.caption(f"⏳ Time left: {format_time_remaining(row['expires_at'])}")
             
             with col2:
-                # ─── AUCTION BIDDING INTERFACE ───
+                is_admin = st.session_state.current_user == "admin"
+                is_seller = st.session_state.current_user == row.get('seller', '')
+                
+                # --- ACTION INTERFACE FOR CURRENT ACTIVE ITEMS ---
                 if (str(row.get('is_auction')) == "True" or row.get('is_auction') is True) and st.session_state.current_user:
                     if st.session_state.current_user != row['seller']:
                         min_bid = int(row['highest_bid']) + 1
@@ -248,9 +282,22 @@ with tab1:
                             st.success("You are the highest bidder!")
                             st.rerun()
                 
-                # Delete permissions
-                is_admin = st.session_state.current_user == "admin"
-                is_seller = st.session_state.current_user == row.get('seller', '')
+                # --- DISCOUNT PORTAL FOR OWNERS ON ACTIVE ITEMS ---
+                elif not is_auction_val and (is_seller or is_admin) and not is_currently_discounted:
+                    with st.expander("🏷️ Trigger Sale"):
+                        instant_discount = st.slider("Sale Cut %", 5, 95, 25, key=f"inst_sld_{row['id']}")
+                        if st.button("Apply Sale Now", key=f"inst_btn_{row['id']}"):
+                            try:
+                                clean_num = int(''.join(filter(str.isdigit, str(row['price']))))
+                            except:
+                                clean_num = 10
+                            df_trades.at[idx, 'sale_price'] = f"{round(clean_num * (1 - instant_discount/100))} Diamonds"
+                            df_trades.at[idx, 'sale_at'] = datetime.now().isoformat()
+                            st.session_state.df_trades = df_trades
+                            save_sheet_data(df_trades, "trades")
+                            st.success("Discount Applied Live!")
+                            st.rerun()
+
                 if is_admin or is_seller:
                     if st.button("❌ Remove Listing", key=f"del_trade_{row['id']}"):
                         st.session_state.df_trades = df_trades.drop(idx)
