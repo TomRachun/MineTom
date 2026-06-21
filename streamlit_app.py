@@ -325,7 +325,9 @@ with tab1:
                 text_input = st.text_input(T["enchants_placeholder"])
                 enchants = [e.strip() for e in text_input.split(",") if e.strip()]
             
-            listing_type = st.radio(T["format"], [T["fixed_price"], T["auction_format"]])
+            # ─── UPDATED FORMAT MATCHING YOUR LABELS ────────────────────────────────
+            listing_type = st.radio(T["format"], ["Standard Fix Price", "Flash Sale / Discount", "Auction (Bidding)"])
+            
             st.markdown(T["duration_settings"])
             is_permanent = st.checkbox(T["stay_forever"], value=False)
             
@@ -336,10 +338,17 @@ with tab1:
                 with col_dur: duration_amount = st.number_input(T["time_amount"], min_value=1, value=2)
                 with col_unit: duration_unit = st.selectbox(T["time_unit"], ["Minutes", "Hours", "Days"] if lang == "English" else ["Minuty", "Hodiny", "Dny"], index=1)
                 
-            if listing_type == T["fixed_price"]:
+            is_auction_val = False
+            sale_price_val = ""
+            
+            if listing_type == "Standard Fix Price":
                 base_price_val = st.number_input(T["base_price"], min_value=1, value=suggested_val if suggested_val > 0 else 10)
                 price_string = f"{base_price_val} Diamonds"
-                is_auction_val = False
+            elif listing_type == "Flash Sale / Discount":
+                base_price_val = st.number_input("Original Price (Diamonds)", min_value=1, value=suggested_val if suggested_val > 0 else 10)
+                sale_price_input = st.number_input("Direct Sale Price (Diamonds)", min_value=1, value=max(1, suggested_val - 2))
+                price_string = f"🔥 SALE: {sale_price_input} Diamonds (Was {base_price_val} 💎)"
+                sale_price_val = str(sale_price_input)
             else:
                 base_price_val = st.number_input(T["start_bid"], min_value=1, value=suggested_val if suggested_val > 0 else 5)
                 price_string = f"Starting bid: {base_price_val} Diamonds"
@@ -353,8 +362,9 @@ with tab1:
                     new_trade = pd.DataFrame([{
                         "id": next_id, "seller": st.session_state.current_user, "item": final_item_name,
                         "amount": int(item_amount_val), "enchants": str(enchants), "price": price_string,
-                        "created_at": datetime.now().isoformat(), "expires_at": exp_time, "sale_price": "",
-                        "sale_at": "", "is_auction": is_auction_val, "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
+                        "created_at": datetime.now().isoformat(), "expires_at": exp_time, "sale_price": sale_price_val,
+                        "sale_at": datetime.now().isoformat() if sale_price_val else "", "is_auction": is_auction_val, 
+                        "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
                     }])
                     st.session_state.df_trades = pd.concat([df_trades, new_trade], ignore_index=True)
                     save_sheet_data(st.session_state.df_trades, "trades")
