@@ -9,16 +9,32 @@ TPS_FILE = "tps.json"
 MAX_TPS = 3
 TODAY = str(date.today())
 
+# ─── SECURE SECRETS DATA FALLBACKS ────────────────────────────────
+# Pulls the data you saved in the cloud panel if the local file resets
+def get_secret_server_defaults():
+    if "hidden_data" in st.secrets:
+        return {
+            "users": dict(st.secrets["hidden_data"]["users"]),
+            "cases": list(st.secrets["hidden_data"]["cases"]),
+            "trades": list(st.secrets["hidden_data"]["trades"])
+        }
+    # Local fallback backup if secrets aren't configured yet
+    return {"users": {"admin": "admin123"}, "cases": [], "trades": []}
+
+def get_secret_tps_defaults():
+    if "hidden_tps" in st.secrets and st.secrets["hidden_tps"].get("date") == TODAY:
+        return {
+            "date": TODAY,
+            "users": dict(st.secrets["hidden_tps"]["users"])
+        }
+    return {"date": TODAY, "users": {"kapitanmisjak": 2}}
+
 # ─── DATA LOADING & SAVING ────────────────────────────────────────
 def load_server_data():
     if os.path.exists(SERVER_FILE):
         with open(SERVER_FILE, "r") as f:
             return json.load(f)
-    return {
-        "users": {"admin": "admin123"},
-        "cases": [],
-        "trades": []
-    }
+    return get_secret_server_defaults()
 
 def save_server_data(data):
     with open(SERVER_FILE, "w") as f:
@@ -26,7 +42,7 @@ def save_server_data(data):
 
 def load_tps_data():
     if not os.path.exists(TPS_FILE):
-        return {"date": TODAY, "users": {}}
+        return get_secret_tps_defaults()
     with open(TPS_FILE, "r") as f:
         data = json.load(f)
     if data["date"] != TODAY:
@@ -47,7 +63,6 @@ if "tps_data" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
-# Shortcut references
 server_data = st.session_state.server_data
 tps_data = st.session_state.tps_data
 
@@ -103,7 +118,7 @@ with tab1:
             if is_enchantable:
                 ench_input = st.text_input("Enchants (comma separated)")
                 enchants = [e.strip() for e in ench_input.split(",") if e.strip()]
-            price = st.text_input("Price (e.g., 3 diamonds)")
+            price = st.text_input("Price (e.g., 10 Diamantů)")
             
             if st.button("Post Trade"):
                 if item and price:
@@ -233,36 +248,32 @@ with tab3:
     st.header("Daily Teleport (TP) Tracker")
     st.info(f"Today's Date Reference: **{TODAY}** (Resets daily)")
     
-    # Using 'key' binds this input directly to st.session_state.tp_user_input
     tp_username = st.text_input("Enter Minecraft Username to track/use", key="tp_user_input").strip().lower()
     
     if tp_username:
-        # Load up-to-date data directly from state reference
-        if tp_username not in st.session_state.tps_data["users"]:
-            st.session_state.tps_data["users"][tp_username] = MAX_TPS
-            save_tps_data(st.session_state.tps_data)
+        if tp_username not in tps_data["users"]:
+            tps_data["users"][tp_username] = MAX_TPS
+            save_tps_data(tps_data)
             
-        current_tps = st.session_state.tps_data["users"][tp_username]
+        current_tps = tps_data["users"][tp_username]
         st.metric(label=f"Remaining TPs for {tp_username}", value=f"{current_tps} / {MAX_TPS}")
         
-        # Only admins can view action buttons and interact
         if st.session_state.current_user == "admin":
             col_use, col_reset = st.columns(2)
             with col_use:
-                # Unique key ensures the button state registers perfectly
                 if st.button("⚡ Use 1 Teleport", key="btn_use_tp"):
                     if current_tps <= 0:
                         st.error(f"💀 {tp_username} has NO TPs left today!")
                     else:
-                        st.session_state.tps_data["users"][tp_username] -= 1
-                        save_tps_data(st.session_state.tps_data)
+                        tps_data["users"][tp_username] -= 1
+                        save_tps_data(tps_data)
                         st.success(f"Teleport tracked for {tp_username}!")
                         st.rerun()
                         
             with col_reset:
                 if st.button("🔄 Admin Reset to Full", key="btn_reset_tp"):
-                    st.session_state.tps_data["users"][tp_username] = MAX_TPS
-                    save_tps_data(st.session_state.tps_data)
+                    tps_data["users"][tp_username] = MAX_TPS
+                    save_tps_data(tps_data)
                     st.success(f"Reset completed for {tp_username}!")
                     st.rerun()
         else:
