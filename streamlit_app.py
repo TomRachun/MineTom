@@ -94,7 +94,9 @@ LOCALES = {
         "claimed_header": "📊 Used Codes History (Admin & Owners)",
         "claimed_cols": ["User", "Code Used"],
         "clear_code_users": "🔄 Reset Code Usage",
-        "clear_success": "Usage limits for this code have been wiped!"
+        "clear_success": "Usage limits for this code have been wiped!",
+        "delete_code_label": "❌ Delete Code permanently",
+        "delete_code_success": "The code has been successfully deleted!"
     },
     "Čeština": {
         "title": "⛏️ Minecraft Server Portál Správy",
@@ -162,7 +164,9 @@ LOCALES = {
         "claimed_header": "📊 Historie Použití Kódů (Admin & Vlastníci)",
         "claimed_cols": ["Uživatel", "Použitý Kód"],
         "clear_code_users": "🔄 Obnovit limit použití kódu",
-        "clear_success": "Limity použití pro tento kód byly smazány!"
+        "clear_success": "Limity použití pro tento kód byly smazány!",
+        "delete_code_label": "❌ Smazat kód navždy",
+        "delete_code_success": "Slevový kód byl úspěšně odstraněn ze systému!"
     }
 }
 
@@ -455,7 +459,7 @@ with tab1:
                     st.markdown(f"Price: **{display_price}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                # Live Promo Code Entry Field Box
+                # Live Promo Code Auto-Evaluation Field
                 if not (str(row.get('is_auction')) == "True" or row.get('is_auction') is True):
                     promo_input = st.text_input(T["use_code_input"], key=f"promo_field_{row['id']}").strip()
                     if promo_input and not df_codes.empty:
@@ -467,7 +471,6 @@ with tab1:
                             discount_amt = int(code_row.get('discount', 0))
                             code_name_clean = str(code_row.get('code', '')).upper()
                             
-                            # 🛑 STOP USER IF THEY ALREADY USED THIS CODE
                             user_clean = str(st.session_state.current_user)
                             already_used = False
                             if not df_claimed.empty and "code" in df_claimed.columns:
@@ -496,12 +499,12 @@ with tab1:
                                     price_after_code = round(base_num * (1 - discount_amt / 100))
                                     st.success(f"{T['code_success']} ✨ **{price_after_code} {T['diamonds']}** ({discount_amt}% OFF)")
                                     
-                                    # 📝 LOG CODE USE IN GOOGLE SHEETS ONCE CLAIMED
-                                    if st.button(f"🛒 Confirm Buy with Code ({code_name_clean})", key=f"confirm_code_buy_{row['id']}"):
+                                    # Automatically log one-time use into database since no confirmation button is needed
+                                    if f"last_logged_{row['id']}" not in st.session_state or st.session_state[f"last_logged_{row['id']}"] != code_name_clean:
                                         new_claim = pd.DataFrame([{"username": user_clean, "code": code_name_clean}])
                                         st.session_state.df_claimed = pd.concat([df_claimed, new_claim], ignore_index=True)
                                         save_sheet_data(st.session_state.df_claimed, "claimed_codes")
-                                        st.rerun()
+                                        st.session_state[f"last_logged_{row['id']}"] = code_name_clean
                                 else:
                                     st.error(T["code_invalid"])
 
@@ -650,9 +653,10 @@ with tab4:
                     st.success("Sale Code Created Successfully!")
                     st.rerun()
                     
-        # 🔒 HIDDEN SECRETS LIST (Only visible to the creator or an admin)
+        # 🔒 PRIVATE SECRETS DASHBOARD
         st.subheader(T["active_codes"])
         if not df_codes.empty and "code" in df_codes.columns:
+            # Filters view: Admin sees everything, owners see their own creations
             private_df = df_codes[is_admin | (df_codes['creator'].astype(str) == st.session_state.current_user)]
             
             if not private_df.empty:
@@ -660,26 +664,46 @@ with tab4:
                 display_df.columns = T["code_table_cols"]
                 st.dataframe(display_df, use_container_width=True)
                 
-                # 🔄 RESET RE-USE BLOCKER FUNCTION
+                # 🛠️ GLOBAL MANAGEMENT UTILITIES (REFRESH LIMITS / PERMANENT DELETIONS)
                 st.markdown("---")
-                st.caption("🔒 **Reset / Refresh Code Claims**")
-                code_to_clear = st.selectbox(T["clear_code_users"], [""] + list(private_df["code"].unique()))
-                if code_to_clear and st.button(T["clear_code_users"]):
-                    if not df_claimed.empty and "code" in df_claimed.columns:
-                        updated_claims = df_claimed[df_claimed["code"].astype(str).str.upper() != str(code_to_clear).upper()]
-                        st.session_state.df_claimed = updated_claims
-                        save_sheet_data(updated_claims, "claimed_codes")
-                        st.success(T["clear_success"])
+                col_actions_1, col_actions_2 = st.columns(2)
+                
+                with col_actions_1:
+                    st.caption("🔄 **Reset / Refresh Code Claims**")
+                    code_to_clear = st.selectbox(T["clear_code_users"], [""] + list(private_df["code"].unique()), key="sb_clear_claims")
+                    if code_to_clear and st.button(T["clear_code_users"], key="btn_clear_claims"):
+                        if not df_claimed.empty and "code" in df_claimed.columns:
+                            updated_claims = df_claimed[df_claimed["code"].astype(str).str.upper() != str(code_to_clear).upper()]
+                            st.session_state.df_claimed = updated_claims
+                            save_sheet_data(updated_claims, "claimed_codes")
+                            st.success(T["clear_success"])
+                            st.rerun()
+                            
+                with col_actions_2:
+                    st.caption("🗑️ **Delete Code Matrix Node**")
+                    code_to_delete = st.selectbox(T["delete_code_label"], [""] + list(private_df["code"].unique()), key="sb_delete_node")
+                    if code_to_delete and st.button(T["delete_code_label"], key="btn_delete_node"):
+                        # Remove code entry row completely
+                        updated_codes = df_codes[df_codes["code"].astype(str).str.upper() != str(code_to_delete).upper()]
+                        st.session_state.df_codes = updated_codes
+                        save_sheet_data(updated_codes, "codes")
+                        
+                        # Wipe related historic log files to keep sheet size efficient
+                        if not df_claimed.empty and "code" in df_claimed.columns:
+                            updated_claims = df_claimed[df_claimed["code"].astype(str).str.upper() != str(code_to_delete).upper()]
+                            st.session_state.df_claimed = updated_claims
+                            save_sheet_data(updated_claims, "claimed_codes")
+                            
+                        st.success(T["delete_code_success"])
                         st.rerun()
             else:
                 st.caption("You haven't created any secrets or codes yet!")
         else:
             st.caption("No sale codes are currently active.")
             
-        # 📊 TRACK WHO USED CODES (Only filters to items owned by the creator, or completely visible to admin)
+        # 📊 TRACK WHO USED CODES
         st.subheader(T["claimed_header"])
         if not df_claimed.empty and "code" in df_claimed.columns:
-            # Find which codes belong to this user
             if is_admin:
                 allowed_codes = list(df_codes["code"].unique()) if not df_codes.empty else []
             else:
