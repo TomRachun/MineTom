@@ -194,7 +194,6 @@ def save_sheet_data(df, worksheet_name):
     elif worksheet_name == "codes": cols = ["code", "creator", "discount", "target_ids", "banned_items", "max_uses"]
     elif worksheet_name == "claimed_codes": cols = ["username", "code"]
     elif worksheet_name == "tps": cols = ["username", "remaining_tps"]
-    # ─── UPDATED COLUMNS ACCORDING TO USER'S STRUCTURE MAPPING ───
     elif worksheet_name == "jail": cols = ["username", "jail_reason", "jail_until"]
     elif worksheet_name == "orders": cols = ["id", "buyer", "item", "target_qty", "current_qty", "reward_diamonds"]
         
@@ -391,8 +390,13 @@ with tab1:
                         for token in banned_tokens:
                             if token == row_id_str or token in item_name_lower: is_banned = True
 
-                    if is_banned: code_success_msg = "BLOCKED_BLACKLIST"
-                    elif times_used >= max_allowed: code_success_msg = "ALREADY_USED"
+                    # ─── SELF-USAGE EXCLUSION LOGIC ───
+                    if code_row.get('creator', '').strip().lower() == str(st.session_state.current_user).lower():
+                        code_success_msg = "OWN_CODE_PROHIBITED"
+                    elif is_banned: 
+                        code_success_msg = "BLOCKED_BLACKLIST"
+                    elif times_used >= max_allowed: 
+                        code_success_msg = "ALREADY_USED"
                     else:
                         base_num = extract_numeric_price(display_price)
                         display_price = f"✨ {round(base_num * (1 - discount_amt / 100))} Diamonds ({discount_amt}% OFF)"
@@ -401,7 +405,9 @@ with tab1:
             with col1:
                 st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({row['amount']}x)**")
                 st.markdown(f"Price: **{display_price}**")
-                if code_success_msg == "BLOCKED_BLACKLIST": st.error(T["code_blocked_msg"])
+                if code_success_msg == "OWN_CODE_PROHIBITED": 
+                    st.warning("⚠️ You cannot use this code and it will be further invalid for you to prevent using it by yourself after seeing this message.")
+                elif code_success_msg == "BLOCKED_BLACKLIST": st.error(T["code_blocked_msg"])
                 elif code_success_msg == "ALREADY_USED": st.error(T["code_already_used"])
                 elif code_success_msg: st.success(code_success_msg)
             with col2:
