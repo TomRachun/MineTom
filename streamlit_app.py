@@ -17,17 +17,17 @@ PRICE_SUGGESTIONS = {
     # ⚔️ High-Tier Gear & Tools
     "Netherite Ingot": 8,
     "Diamond Block": 9,
-    "Elytra": 150,
-    "Shulker Box": 20,
-    "Beacon": 40,
-    "Totem of Undying": 30,
-    "Nether Star": 30,
+    "Elytra": 15,
+    "Shulker Box": 4,
+    "Beacon": 20,
+    "Totem of Undying": 3,
+    "Nether Star": 16,
     "Ancient Debris": 2,
-    "Mending Book": 50,
-    "Silk Touch Book": 30,
-    "Unbreaking III Book": 30,
-    "Efficiency V Book": 40,
-    "Trident": 80,
+    "Mending Book": 5,
+    "Silk Touch Book": 3,
+    "Unbreaking III Book": 3,
+    "Efficiency V Book": 4,
+    "Trident": 8,
     # 🐾 Animals & Entities
     "Horse (Tamed / High Stats)": 5,
     "Donkey / Mule": 4,
@@ -81,8 +81,8 @@ LOCALES = {
         "admin_reset_header": "🛡️ Admin Password Reset",
         "select_player": "Select Player",
         "reset_pass_btn": "Reset Player Password",
-        "tabs": ["🛒 Trade Store", "📜 Case Records", "⚡ Teleport Tracker", "🎟️ Sale Codes"],
-        "marketplace": "Server Marketplace",
+        "tabs": ["🛒 Trade Store", "📜 Custom Orders", "⚡ Teleport Tracker", "🎟️ Sale Codes"],
+        "marketplace": "Server Marketplace & Exchange",
         "create_listing": "➕ Create Listing (Sale / Sale Delay / Auction)",
         "item_name": "Item Selection (Type to Search)",
         "custom_item": "Enter Custom Item Name",
@@ -109,7 +109,7 @@ LOCALES = {
         "publish": "Publish Listing",
         "active_listings": "Active Listings",
         "global_coupon_label": "🎟️ Apply Promo / Sale Code for Checkout",
-        "global_coupon_placeholder": "Enter code (e.g. CUSTOMERCHOICE) and press Enter",
+        "global_coupon_placeholder": "Enter code (e.g. CHOOSEONE) and press Enter",
         "coupon_login_required": "🔒 Please log in to your account to use checkout codes.",
         "no_items": "No items on sale right now.",
         "time_left": "⏳ Time left: {}",
@@ -125,7 +125,7 @@ LOCALES = {
         "refresh_btn": "🔄 Force Refresh Data",
         "code_header": "🎟️ Promo & Sale Codes Manager",
         "create_code": "➕ Create New Sale Code",
-        "code_input": "Sale Code Name (e.g. CHOOSE25)",
+        "code_input": "Sale Code Name (e.g. VOLBA25)",
         "code_pct": "Discount Percentage",
         "code_scope": "Code Target Scope",
         "scope_global": "Global (All your items)",
@@ -135,7 +135,7 @@ LOCALES = {
         "specific_help": "Enter comma separated IDs (e.g. 1, 4, 12)",
         "btn_create_code": "Generate Code",
         "active_codes": "Active Sale Codes",
-        "code_table_cols": ["Code", "Creator", "Discount", "Scope / IDs"],
+        "code_table_cols": ["Code", "Creator", "Discount", "Scope / IDs", "Banned Items"],
         "code_success": "✅ Code Applied! Price updated.",
         "code_invalid": "❌ Code invalid for this item.",
         "code_already_used": "⚠️ You have already used this code!",
@@ -144,7 +144,9 @@ LOCALES = {
         "clear_code_users": "🔄 Reset Code Usage",
         "clear_success": "Usage limits for this code have been wiped!",
         "delete_code_label": "❌ Delete Code permanently",
-        "delete_code_success": "The code has been successfully deleted!"
+        "delete_code_success": "The code has been successfully deleted!",
+        "code_banned_expl": "🚫 Banned Item List for Code (Comma Separated)",
+        "code_blocked_msg": "🚫 Code blocked! This item is blacklisted by the shop owner."
     },
     "Čeština": {
         "title": "⛏️ Minecraft Server Portál Správy",
@@ -162,8 +164,8 @@ LOCALES = {
         "admin_reset_header": "🛡️ Admin Reset Hesla",
         "select_player": "Vyberte Hráče",
         "reset_pass_btn": "Resetovat Heslo Hráče",
-        "tabs": ["🛒 Obchod / Tržiště", "📜 Záznamy Trestů", "⚡ Teleport Tracker", "🎟️ Slevové Kódy"],
-        "marketplace": "Serverové Tržiště",
+        "tabs": ["🛒 Obchod / Tržiště", "📜 Zakázky / Objednávky", "⚡ Teleport Tracker", "🎟️ Slevové Kódy"],
+        "marketplace": "Serverové Tržiště a Výměna",
         "create_listing": "➕ Vytvořit Nabídku (Sleva / Zpožděný prodej / Aukce)",
         "item_name": "Výběr Předmětu (Pište pro hledání)",
         "custom_item": "Zadejte vlastní název předmětu",
@@ -216,7 +218,7 @@ LOCALES = {
         "specific_help": "Zadejte ID oddělená čárkou (např. 1, 4, 12)",
         "btn_create_code": "Generovat Kód",
         "active_codes": "Aktivní Slevové Kódy",
-        "code_table_cols": ["Kód", "Tvůrce", "Sleva", "Rozsah / ID"],
+        "code_table_cols": ["Kód", "Tvůrce", "Sleva", "Rozsah", "Zakázané Položky"],
         "code_success": "✅ Kód uplatněn! Cena byla upravena.",
         "code_invalid": "❌ Neplatný slevový kód pro tuto položku.",
         "code_already_used": "⚠️ Tento kód jsi již jednou použil!",
@@ -225,7 +227,9 @@ LOCALES = {
         "clear_code_users": "🔄 Obnovit limit použití kódu",
         "clear_success": "Limity použití pro tento kód byly smazány!",
         "delete_code_label": "❌ Smazat kód navždy",
-        "delete_code_success": "Slevový kód byl úspěšně odstraněn ze systému!"
+        "delete_code_success": "Slevový kód byl úspěšně odstraněn ze systému!",
+        "code_banned_expl": "🚫 Seznam zakázaných předmětů pro kód (oddělený čárkou)",
+        "code_blocked_msg": "🚫 Kód zablokován! Tento předmět je majitelem na černé listině."
     }
 }
 
@@ -261,13 +265,16 @@ def save_sheet_data(df, worksheet_name):
     elif worksheet_name == "trades":
         cols = ["id", "seller", "item", "amount", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
     elif worksheet_name == "codes":
-        cols = ["code", "creator", "discount", "target_ids"]
+        cols = ["code", "creator", "discount", "target_ids", "banned_items"]
     elif worksheet_name == "claimed_codes":
         cols = ["username", "code"]
     elif worksheet_name == "tps":
         cols = ["username", "remaining_tps"]
-        if "username_clean" in df.columns:
-            df = df.drop(columns=["username_clean"])
+    elif worksheet_name == "orders":
+        cols = ["id", "buyer", "item", "target_qty", "current_qty", "reward_diamonds"]
+        
+    if "username_clean" in df.columns:
+        df = df.drop(columns=["username_clean"])
             
     df_save = df.reindex(columns=cols).fillna("")
     rows_list = df_save.values.tolist()
@@ -334,6 +341,8 @@ if "df_claimed" not in st.session_state:
     st.session_state.df_claimed = get_sheet_data("claimed_codes")
 if "df_tps" not in st.session_state:
     st.session_state.df_tps = get_sheet_data("tps")
+if "df_orders" not in st.session_state:
+    st.session_state.df_orders = get_sheet_data("orders")
 if "current_user" not in st.session_state:
     st.session_state.current_user = None
 
@@ -358,6 +367,7 @@ if st.button(T["refresh_btn"], use_container_width=True):
     st.session_state.df_trades = get_sheet_data("trades")
     st.session_state.df_codes = get_sheet_data("codes")
     st.session_state.df_claimed = get_sheet_data("claimed_codes")
+    st.session_state.df_orders = get_sheet_data("orders")
     st.rerun()
 
 # Authentication UI
@@ -393,42 +403,6 @@ else:
     if st.sidebar.button(T["logout"]):
         st.session_state.current_user = None
         st.rerun()
-        
-    st.sidebar.markdown("---")
-    
-    st.sidebar.subheader(T["change_pass_header"])
-    new_pass_input = st.sidebar.text_input(T["new_password"], type="password", key="owner_change_pass_field")
-    if st.sidebar.button(T["update_pass_btn"], key="owner_change_pass_btn"):
-        if new_pass_input.strip():
-            df_u = st.session_state.df_users
-            user_clean = str(st.session_state.current_user).strip().lower()
-            matched_indices = df_u[df_u['username'].astype(str).str.strip().str.lower() == user_clean].index
-            if not matched_indices.empty:
-                df_u.at[matched_indices[0], 'password'] = str(new_pass_input).strip()
-                st.session_state.df_users = df_u
-                save_sheet_data(df_u, "users")
-                st.sidebar.success(T["pass_update_success"])
-                time.sleep(1)
-                st.rerun()
-
-    if st.session_state.current_user == "admin":
-        st.sidebar.markdown("---")
-        st.sidebar.subheader(T["admin_reset_header"])
-        df_u = st.session_state.df_users
-        if not df_u.empty and 'username' in df_u.columns:
-            player_list = sorted(list(df_u['username'].astype(str).str.strip().values))
-            selected_player_to_reset = st.sidebar.selectbox(T["select_player"], player_list, key="admin_sb_p_reset")
-            admin_new_pass = st.sidebar.text_input(T["new_password"], type="password", key="admin_txt_p_reset")
-            if st.sidebar.button(T["reset_pass_btn"], key="admin_btn_p_reset"):
-                if selected_player_to_reset and admin_new_pass.strip():
-                    matched_admin_idx = df_u[df_u['username'].astype(str).str.strip() == str(selected_player_to_reset)].index
-                    if not matched_admin_idx.empty:
-                        df_u.at[matched_admin_idx[0], 'password'] = str(admin_new_pass).strip()
-                        st.session_state.df_users = df_u
-                        save_sheet_data(df_u, "users")
-                        st.sidebar.success(f"Successfully reset password for {selected_player_to_reset}!")
-                        time.sleep(1)
-                        st.rerun()
 
 tab1, tab2, tab3, tab4 = st.tabs(T["tabs"])
 
@@ -446,7 +420,7 @@ with tab1:
             selected_item_key = st.selectbox(
                 T["item_name"], 
                 list(PRICE_SUGGESTIONS.keys()),
-                help="Type to search through available suggestions / Zapište pro vyhledávání v doporučeních"
+                help="Type to search available item catalog configurations"
             )
             
             if selected_item_key == "Custom Item / Jiný předmět":
@@ -458,7 +432,6 @@ with tab1:
                 st.caption(f"{T['suggested']} **{suggested_val} {T['diamonds']}**")
             
             item_amount_val = st.number_input(T["item_amount"], min_value=1, value=1, step=1)
-                
             is_enchantable = st.checkbox(T["enchantable"])
             enchants = []
             if is_enchantable:
@@ -534,7 +507,6 @@ with tab1:
 
     st.subheader(T["active_listings"])
     
-    # 🔒 AUTH PROTECTION: Only logged-in accounts can submit checkouts
     if st.session_state.current_user:
         global_promo_input = st.text_input(T["global_coupon_label"], placeholder=T["global_coupon_placeholder"], key="global_promo_checkout_field").strip().upper()
     else:
@@ -545,8 +517,8 @@ with tab1:
         st.write(T["no_items"])
     else:
         search_query = st.text_input("🔍 Search items or sellers / Hledat předměty nebo prodejce", "").strip().lower()
-        
         now_str = datetime.now().isoformat()
+        
         for idx, row in df_trades.iterrows():
             item_name_lower = str(row.get('item', '')).lower()
             seller_name_lower = str(row.get('seller', '')).lower()
@@ -555,7 +527,6 @@ with tab1:
                 continue
                 
             col1, col2 = st.columns([4, 2])
-            
             display_price = str(row.get('price', 'Free'))
             has_any_sale_configured = pd.notna(row.get('sale_at')) and row['sale_at'] != ""
             
@@ -569,8 +540,10 @@ with tab1:
             raw_amt = row.get('amount')
             amt_badge = f" ({int(raw_amt)}x)" if pd.notna(raw_amt) and str(raw_amt).strip() != "" else ""
 
-            # Check if promo code applies dynamically to this specific loop item
+            # Check Coupon Restrictions
             code_success_msg = None
+            is_blocked_by_blacklist = False
+            
             if global_promo_input and not df_codes.empty:
                 matched_code = df_codes[df_codes['code'].astype(str).str.upper() == global_promo_input]
                 if not matched_code.empty:
@@ -579,6 +552,14 @@ with tab1:
                     scope = str(code_row.get('target_ids', 'GLOBAL'))
                     discount_amt = int(code_row.get('discount', 0))
                     code_name_clean = str(code_row.get('code', '')).upper()
+                    banned_items_str = str(code_row.get('banned_items', ''))
+                    
+                    # Owner Anti-Overpowered Blacklist check
+                    if banned_items_str.strip():
+                        banned_keywords = [k.strip().lower() for k in banned_items_str.split(",") if k.strip()]
+                        for keyword in banned_keywords:
+                            if keyword in item_name_lower:
+                                is_blocked_by_blacklist = True
                     
                     user_clean = str(st.session_state.current_user)
                     already_used = False
@@ -590,17 +571,17 @@ with tab1:
                         if not matched_claims.empty:
                             already_used = True
                     
-                    if already_used:
+                    if is_blocked_by_blacklist:
+                        code_success_msg = "BLOCKED_BLACKLIST"
+                    elif already_used:
                         code_success_msg = "ALREADY_USED"
                     else:
                         is_valid_code = False
-                        # Regular complete global scopes
                         if creator == "admin" and scope in ["GLOBAL", "CHOOSE_ONE"]:
                             is_valid_code = True
                         elif creator == row['seller'] and scope in ["GLOBAL", "CHOOSE_ONE"]:
                             is_valid_code = True
                         elif scope not in ["GLOBAL", "CHOOSE_ONE"] and scope != "":
-                            # Specific ID-only listings match
                             parsed_ids = [id_item.strip() for id_item in scope.split(",") if id_item.strip()]
                             if str(row['id']) in parsed_ids:
                                 is_valid_code = True
@@ -608,88 +589,30 @@ with tab1:
                         if is_valid_code and discount_amt > 0:
                             base_num = extract_numeric_price(display_price)
                             price_after_code = round(base_num * (1 - discount_amt / 100))
-                            
-                            # DYNAMIC LIVE CLIENT INTERFACE PREVIEW OVERWRITE
-                            display_price = f"✨ {price_after_code} Diamonds ({discount_amt}% PROMO CODE OFF)"
+                            display_price = f"✨ {price_after_code} Diamonds ({discount_amt}% PROMO OFF)"
                             code_success_msg = f"{T['code_success']} ({discount_amt}% OFF)"
-                            
-                            if f"last_logged_{row['id']}" not in st.session_state or st.session_state[f"last_logged_{row['id']}"] != code_name_clean:
-                                new_claim = pd.DataFrame([{"username": user_clean, "code": code_name_clean}])
-                                st.session_state.df_claimed = pd.concat([df_claimed, new_claim], ignore_index=True)
-                                save_sheet_data(st.session_state.df_claimed, "claimed_codes")
-                                st.session_state[f"last_logged_{row['id']}"] = code_name_clean
 
             with col1:
                 if str(row.get('is_auction')) == "True" or row.get('is_auction') is True:
                     st.markdown(f"**🏆 [AUCTION] ID {row['id']}: {row['seller']}'s {row['item']}{amt_badge}**")
                     st.caption(f"Enchants: {row.get('enchants', 'None')}")
-                    if row.get('highest_bidder'):
-                        st.markdown(f"Current Bid: **{row['highest_bid']} Diamonds** by `{row['highest_bidder']}`")
-                    else:
-                        st.markdown(f"Starting Bid: **{row['highest_bid']} Diamonds**")
+                    st.markdown(f"Current Bid: **{row['highest_bid']} Diamonds**")
                 else:
                     st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']}{amt_badge}**")
                     st.markdown(f"Price: **{display_price}**")
-                    st.caption(f"Enchants: {row.get('enchants', 'None')}")
                 
-                if code_success_msg == "ALREADY_USED":
+                if code_success_msg == "BLOCKED_BLACKLIST":
+                    st.error(T["code_blocked_msg"])
+                elif code_success_msg == "ALREADY_USED":
                     st.error(T["code_already_used"])
                 elif code_success_msg:
                     st.success(code_success_msg)
 
-                exp_status = format_time_remaining(row.get('expires_at'))
-                st.caption(T["time_left"].format(exp_status))
+                st.caption(T["time_left"].format(format_time_remaining(row.get('expires_at'))))
             
             with col2:
                 is_admin = st.session_state.current_user == "admin"
                 is_seller = st.session_state.current_user == row.get('seller', '')
-                is_item_auction = str(row.get('is_auction')) == "True" or row.get('is_auction') is True
-                
-                if is_item_auction and st.session_state.current_user:
-                    if st.session_state.current_user != row['seller']:
-                        min_bid = int(row['highest_bid']) + 1
-                        bid_amount = st.number_input(T["bid_min"].format(min_bid), min_value=min_bid, step=1, key=f"bid_val_{row['id']}")
-                        if st.button(T["place_bid"], key=f"bid_btn_{row['id']}"):
-                            df_trades.at[idx, 'highest_bid'] = bid_amount
-                            df_trades.at[idx, 'highest_bidder'] = st.session_state.current_user
-                            st.session_state.df_trades = df_trades
-                            save_sheet_data(df_trades, "trades")
-                            st.rerun()
-                
-                if not is_item_auction and (is_seller or is_admin):
-                    with st.expander(T["manage_exp"]):
-                        mod_perm = st.checkbox(T["stay_forever"], value=("Permanent" in exp_status or pd.isna(row.get('expires_at')) or str(row.get('expires_at')) == ""), key=f"mod_perm_{row['id']}")
-                        if not mod_perm:
-                            col_m_amt, col_m_unit = st.columns(2)
-                            with col_m_amt:
-                                mod_amount = st.number_input(T["time_amount"], min_value=1, value=10, key=f"mod_amt_{row['id']}")
-                            with col_m_unit:
-                                mod_unit = st.selectbox(T["time_unit"], ["Minutes", "Hours", "Days"] if lang == "English" else ["Minuty", "Hodiny", "Dny"], index=1, key=f"mod_unit_{row['id']}")
-                        if st.button(T["update_exp"], key=f"mod_exp_btn_{row['id']}"):
-                            df_trades.at[idx, 'expires_at'] = "Permanent" if mod_perm else (datetime.now() + calculate_delta(mod_amount, mod_unit)).isoformat()
-                            st.session_state.df_trades = df_trades
-                            save_sheet_data(df_trades, "trades")
-                            st.rerun()
-
-                    if has_any_sale_configured:
-                        if st.button(T["remove_sale"], key=f"rm_sale_{row['id']}"):
-                            df_trades.at[idx, 'sale_price'] = ""
-                            df_trades.at[idx, 'sale_at'] = ""
-                            st.session_state.df_trades = df_trades
-                            save_sheet_data(df_trades, "trades")
-                            st.rerun()
-                    else:
-                        with st.expander(T["trigger_sale"]):
-                            inst_mode = st.radio(T["discount_type"], [T["pct_off_label"], T["make_free_label"]], key=f"inst_mode_{row['id']}")
-                            inst_pct = st.slider("Select %", 1, 100, 25, key=f"inst_sld_{row['id']}") if inst_mode == T["pct_off_label"] else 100
-                            preview_price = calculate_sale_display(row['price'], inst_mode, inst_pct)
-                            if st.button(T["apply_now"], key=f"inst_btn_{row['id']}"):
-                                df_trades.at[idx, 'sale_price'] = preview_price
-                                df_trades.at[idx, 'sale_at'] = datetime.now().isoformat()
-                                st.session_state.df_trades = df_trades
-                                save_sheet_data(df_trades, "trades")
-                                st.rerun()
-
                 if is_admin or is_seller:
                     if st.button(T["remove_listing"], key=f"del_trade_{row['id']}"):
                         st.session_state.df_trades = df_trades.drop(idx)
@@ -698,11 +621,73 @@ with tab1:
             st.divider()
 
 # ==========================================
-# TAB 2: CASE RECORDS
+# TAB 2: CUSTOM DEMAND ORDERS BOARD
 # ==========================================
 with tab2:
-    st.header(T["tabs"][1])
-    st.info("Held in temporary cache.")
+    st.header("📜 Production & Delivery Orders Board")
+    df_orders = st.session_state.df_orders
+    
+    if st.session_state.current_user:
+        with st.expander("➕ Request / Post New Custom Supply Order"):
+            req_item = st.text_input("Requested Item Name (e.g., Glass Blocks)", key="order_item_field").strip()
+            req_qty = st.number_input("Target Quantity Needed", min_value=1, value=80)
+            req_reward = st.number_input("Reward Payment (Diamonds)", min_value=1, value=5)
+            
+            if st.button("Broadcast Order Request"):
+                if req_item:
+                    next_oid = int(df_orders["id"].max() + 1) if not df_orders.empty and 'id' in df_orders.columns else 1
+                    new_order = pd.DataFrame([{
+                        "id": next_oid,
+                        "buyer": st.session_state.current_user,
+                        "item": req_item,
+                        "target_qty": int(req_qty),
+                        "current_qty": 0,
+                        "reward_diamonds": int(req_reward)
+                    }])
+                    st.session_state.df_orders = pd.concat([df_orders, new_order], ignore_index=True)
+                    save_sheet_data(st.session_state.df_orders, "orders")
+                    st.rerun()
+                    
+    if df_orders.empty:
+        st.caption("No custom server orders currently requested.")
+    else:
+        for o_idx, o_row in df_orders.iterrows():
+            st.markdown(f"### 📦 Order #{o_row['id']}: Delivery for `{o_row['buyer']}`")
+            st.markdown(f"**Item Needed:** {o_row['item']} | **Reward:** {o_row['reward_diamonds']} Diamonds")
+            
+            # Progress fulfillment computations
+            curr = int(o_row['current_qty'])
+            target = int(o_row['target_qty'])
+            remaining = max(0, target - curr)
+            progress_pct = min(1.0, float(curr / target))
+            
+            st.progress(progress_pct)
+            st.markdown(f"📊 **Fulfillment Status:** Brought `{curr}` / `{target}` total units (**{remaining} units remaining**)")
+            
+            # Management lines for Order Owners / Buyers
+            if st.session_state.current_user == o_row['buyer'] or st.session_state.current_user == "admin":
+                col_add, col_sub, col_del = st.columns([2, 2, 2])
+                with col_add:
+                    adj_add = st.number_input("Add Delivered amount", min_value=1, max_value=remaining if remaining > 0 else 64, value=1, key=f"add_qty_{o_row['id']}")
+                    if st.button("➕ Adjust Got Up", key=f"btn_add_qty_{o_row['id']}"):
+                        df_orders.at[o_idx, 'current_qty'] = curr + adj_add
+                        st.session_state.df_orders = df_orders
+                        save_sheet_data(df_orders, "orders")
+                        st.rerun()
+                with col_sub:
+                    adj_sub = st.number_input("Subtract units", min_value=1, max_value=curr if curr > 0 else 1, value=1, key=f"sub_qty_{o_row['id']}")
+                    if st.button("➖ Adjust Got Down", key=f"btn_sub_qty_{o_row['id']}"):
+                        df_orders.at[o_idx, 'current_qty'] = max(0, curr - adj_sub)
+                        st.session_state.df_orders = df_orders
+                        save_sheet_data(df_orders, "orders")
+                        st.rerun()
+                with col_del:
+                    st.write("")
+                    if st.button("❌ Close Order", key=f"close_order_{o_row['id']}", use_container_width=True):
+                        st.session_state.df_orders = df_orders.drop(o_idx)
+                        save_sheet_data(st.session_state.df_orders, "orders")
+                        st.rerun()
+            st.divider()
 
 # ==========================================
 # TAB 3: TELEPORT TRACKER
@@ -718,7 +703,7 @@ with tab3:
         user_tp_row = df_tps[df_tps['username_clean'] == tp_username]
         
         if user_tp_row.empty:
-            new_tp_user = pd.DataFrame([{"username": tp_username, "remaining_tps": MAX_TPS, "username_clean": tp_username}])
+            new_tp_user = pd.DataFrame([{"username": tp_username, "remaining_tps": MAX_TPS}])
             df_tps = pd.concat([df_tps, new_tp_user], ignore_index=True)
             st.session_state.df_tps = df_tps
             save_sheet_data(df_tps, "tps")
@@ -727,23 +712,6 @@ with tab3:
             current_tps = int(user_tp_row.iloc[0]['remaining_tps'])
             
         st.metric(label=f"Remaining TPs: {tp_username}", value=f"{current_tps} / {MAX_TPS}")
-        
-        if st.session_state.current_user == "admin":
-            col_use, col_reset = st.columns(2)
-            user_idx = df_tps[df_tps['username_clean'] == tp_username].index[0]
-            with col_use:
-                if st.button("⚡ Use 1 TP", key="btn_use_tp"):
-                    if current_tps > 0:
-                        df_tps.at[user_idx, 'remaining_tps'] = current_tps - 1
-                        st.session_state.df_tps = df_tps
-                        save_sheet_data(df_tps, "tps")
-                        st.rerun()
-            with col_reset:
-                if st.button("🔄 Reset TPs", key="btn_reset_tp"):
-                    df_tps.at[user_idx, 'remaining_tps'] = MAX_TPS
-                    st.session_state.df_tps = df_tps
-                    save_sheet_data(df_tps, "tps")
-                    st.rerun()
 
 # ==========================================
 # TAB 4: ADVANCED SALE CODES (SLEVOVÉ KÓDY)
@@ -759,7 +727,6 @@ with tab4:
             new_code_str = st.text_input(T["code_input"]).strip().upper()
             code_discount = st.slider(T["code_pct"], 1, 100, 15)
             
-            # Added new custom targeted "CHOOSE_ONE" scope definition selection
             scope_options = [T["scope_global"], T["scope_choose_one"], T["scope_specific"]]
             if is_admin:
                 scope_options.insert(0, T["scope_admin_global"])
@@ -772,13 +739,17 @@ with tab4:
             elif selected_scope == T["scope_specific"]:
                 target_ids_val = st.text_input(T["specific_help"]).strip()
                 
+            # Blacklist input configuration to prevent overpowered coupon uses
+            banned_items_input = st.text_input(T["code_banned_expl"], placeholder="e.g. Elytra, Netherite Ingot, Beacon")
+                
             if st.button(T["btn_create_code"]):
                 if new_code_str:
                     new_code_entry = pd.DataFrame([{
                         "code": new_code_str,
                         "creator": st.session_state.current_user,
                         "discount": code_discount,
-                        "target_ids": target_ids_val
+                        "target_ids": target_ids_val,
+                        "banned_items": banned_items_input.strip()
                     }])
                     st.session_state.df_codes = pd.concat([df_codes, new_code_entry], ignore_index=True)
                     save_sheet_data(st.session_state.df_codes, "codes")
@@ -790,63 +761,6 @@ with tab4:
             private_df = df_codes[is_admin | (df_codes['creator'].astype(str) == st.session_state.current_user)]
             
             if not private_df.empty:
-                display_df = private_df.reindex(columns=["code", "creator", "discount", "target_ids"]).fillna("")
+                display_df = private_df.reindex(columns=["code", "creator", "discount", "target_ids", "banned_items"]).fillna("")
                 display_df.columns = T["code_table_cols"]
                 st.dataframe(display_df, use_container_width=True)
-                
-                st.markdown("---")
-                col_actions_1, col_actions_2 = st.columns(2)
-                
-                with col_actions_1:
-                    st.caption("🔄 **Reset / Refresh Code Claims**")
-                    code_to_clear = st.selectbox(T["clear_code_users"], [""] + list(private_df["code"].unique()), key="sb_clear_claims")
-                    if code_to_clear and st.button(T["clear_code_users"], key="btn_clear_claims"):
-                        if not df_claimed.empty and "code" in df_claimed.columns:
-                            updated_claims = df_claimed[df_claimed["code"].astype(str).str.upper() != str(code_to_clear).upper()]
-                            st.session_state.df_claimed = updated_claims
-                            save_sheet_data(updated_claims, "claimed_codes")
-                            st.success(T["clear_success"])
-                            st.rerun()
-                            
-                with col_actions_2:
-                    st.caption("🗑️ **Delete Code Matrix Node**")
-                    code_to_delete = st.selectbox(T["delete_code_label"], [""] + list(private_df["code"].unique()), key="sb_delete_node")
-                    if code_to_delete and st.button(T["delete_code_label"], key="btn_delete_node"):
-                        updated_codes = df_codes[df_codes["code"].astype(str).str.upper() != str(code_to_delete).upper()]
-                        st.session_state.df_codes = updated_codes
-                        save_sheet_data(updated_codes, "codes")
-                        
-                        if not df_claimed.empty and "code" in df_claimed.columns:
-                            updated_claims = df_claimed[df_claimed["code"].astype(str).str.upper() != str(code_to_delete).upper()]
-                            st.session_state.df_claimed = updated_claims
-                            save_sheet_data(updated_claims, "claimed_codes")
-                            
-                        st.success(T["delete_code_success"])
-                        st.rerun()
-            else:
-                st.caption("You haven't created any secrets or codes yet!")
-        else:
-            st.caption("No sale codes are currently active.")
-            
-        st.subheader(T["claimed_header"])
-        if not df_claimed.empty and "code" in df_claimed.columns:
-            if is_admin:
-                allowed_codes = list(df_codes["code"].unique()) if not df_codes.empty else []
-            else:
-                allowed_codes = list(df_codes[df_codes["creator"] == st.session_state.current_user]["code"].unique()) if not df_codes.empty else []
-                
-            visible_claims = df_claimed[df_claimed["code"].str.upper().isin([c.upper() for c in allowed_codes])]
-            if not visible_claims.empty:
-                display_claims = visible_claims.reindex(columns=["username", "code"])
-                display_claims.columns = T["claimed_cols"]
-                st.dataframe(display_claims, use_container_width=True)
-            else:
-                st.caption("No users have applied your codes yet.")
-        else:
-            st.caption("No code logs recorded yet.")
-            
-    else:
-        st.info("Log in to create or view sale codes.")
-
-# Auto-refresh trigger
-st.fragment(run_every=30)(lambda: None)()
