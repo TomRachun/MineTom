@@ -235,6 +235,7 @@ if "df_orders" not in st.session_state: st.session_state.df_orders = get_sheet_d
 if "df_ledger" not in st.session_state: st.session_state.df_ledger = get_sheet_data("sales_ledger")
 if "df_pending" not in st.session_state: st.session_state.df_pending = get_sheet_data("pending_buys")
 if "current_user" not in st.session_state: st.session_state.current_user = None
+if "impersonated_user" not in st.session_state: st.session_state.impersonated_user = None
 
 if st.button(T["refresh_btn"], use_container_width=True):
     st.session_state.df_users = get_sheet_data("users")
@@ -247,6 +248,9 @@ if st.button(T["refresh_btn"], use_container_width=True):
     st.session_state.df_ledger = get_sheet_data("sales_ledger")
     st.session_state.df_pending = get_sheet_data("pending_buys")
     st.rerun()
+
+# Determine active context user (True identity vs Spoofed choice)
+active_session_user = st.session_state.impersonated_user if st.session_state.impersonated_user else st.session_state.current_user
 
 # Authentication UI
 st.sidebar.header(T["auth_header"])
@@ -277,6 +281,23 @@ if st.session_state.current_user is None:
 else:
     st.sidebar.success(f"Logged in as: **{st.session_state.current_user}**")
     
+    # ─── ADMIN FEATURE: IMPERSONATE ANY REGISTERED ACCOUNT ───
+    if st.session_state.current_user == "admin":
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("🎭 Admin Identity Hijack Overrides")
+        all_players_list = ["None / Use Admin Profile"] + list(st.session_state.df_users['username'].astype(str).values)
+        selected_spoof = st.sidebar.selectbox("Impersonate/Login As:", all_players_list)
+        if selected_spoof == "None / Use Admin Profile":
+            if st.session_state.impersonated_user is not None:
+                st.session_state.impersonated_user = None
+                st.rerun()
+        else:
+            if st.session_state.impersonated_user != selected_spoof:
+                st.session_state.impersonated_user = selected_spoof
+                st.rerun()
+        if st.session_state.impersonated_user:
+            st.sidebar.warning(f"Active Identity: **{st.session_state.impersonated_user}**")
+            
     with st.sidebar.expander("🔑 Password Settings" if lang == "English" else "🔑 Nastavení Hesla"):
         df_u = st.session_state.df_users
         if st.session_state.current_user == "admin":
@@ -300,6 +321,7 @@ else:
                     
     if st.sidebar.button(T["logout"]):
         st.session_state.current_user = None
+        st.session_state.impersonated_user = None
         st.rerun()
 
 tab1, tab2, tab3, tab4 = st.tabs(T["tabs"])
@@ -315,7 +337,7 @@ with tab1:
     df_ledger = st.session_state.df_ledger
     df_pending = st.session_state.df_pending
     
-    if st.session_state.current_user:
+    if active_session_user:
         # EXPANDER 1: CREATE NEW ITEMS
         with st.expander(T["create_listing"]):
             selected_item_key = st.selectbox(T["item_name"], list(PRICE_SUGGESTIONS.keys()))
@@ -388,7 +410,7 @@ with tab1:
                     exp_time = "Permanent" if is_permanent else (datetime.now() + calculate_delta(duration_amount, duration_unit)).isoformat()
                     
                     new_trade = pd.DataFrame([{
-                        "id": next_id, "seller": st.session_state.current_user, "item": final_item_name,
+                        "id": next_id, "seller": active_session_user, "item": final_item_name,
                         "amount": int(item_amount_val), "enchants": str(enchants), "price": price_string,
                         "created_at": datetime.now().isoformat(), "expires_at": exp_time, "sale_price": sale_price_val,
                         "sale_at": sale_at_val, "is_auction": is_auction_val, "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
@@ -401,12 +423,17 @@ with tab1:
         with st.expander("🏷️ Shop Owner Control Panel & Pending Approvals"):
             st.markdown("#### ⏳ Pending Sales Awaiting Your Confirmation")
             if df_pending is not None and not df_pending.empty:
-                my_pending = df_pending[df_pending['seller'].astype(str).str.lower() == st.session_state.current_user.lower()]
+                # ─── ADMIN FEATURE: ADMIN CAN SEE AND CONTROL ALL SALES GLOBLALLY ───
+                if st.session_state.current_user == "admin":
+                    my_pending = df_pending
+                else:
+                    my_pending = df_pending[df_pending['seller'].astype(str).str.lower() == active_session_user.lower()]
+                    
                 if my_pending.empty:
                     st.caption("No one is waiting for delivery right now.")
                 else:
                     for p_idx, p_row in my_pending.iterrows():
-                        st.info(f"👤 **{p_row['buyer']}** wants to buy **{p_row['item']}** ({p_row['amount']}x) for the locked price of **{p_row['locked_price']}**")
+                        st.info(f"👤 [Seller: {p_row['seller']}] | **{p_row['buyer']}** wants to buy **{p_row['item']}** ({p_row['amount']}x) for the locked price of **{p_row['locked_price']}**")
                         c_app, c_rej = st.columns(2)
                         with c_app:
                             if st.button(f"✅ Accept Buy & Deliver (Locked: {p_row['locked_price']})", key=f"app_{p_idx}"):
@@ -436,9 +463,14 @@ with tab1:
             
             st.markdown("#### ⚙️ Edit Active Run-time Items")
             if not df_trades.empty and 'seller' in df_trades.columns:
-                user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == st.session_state.current_user.lower()) & (df_trades['is_auction'] == False)]
+                # ─── ADMIN FEATURE: ADMIN CONTROLS ALL USERS' ACTIVE RUN-TIME ITEMS ───
+                if st.session_state.current_user == "admin":
+                    user_items = df_trades[df_trades['is_auction'] == False]
+                else:
+                    user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == active_session_user.lower()) & (df_trades['is_auction'] == False)]
+                    
                 if not user_items.empty:
-                    item_options = {f"ID {r['id']} - {r['item']} ({r['amount']}x) [Current: {r['price']}]": r['id'] for _, r in user_items.iterrows()}
+                    item_options = {f"ID {r['id']} - [{r['seller']}] {r['item']} ({r['amount']}x) [Current: {r['price']}]": r['id'] for _, r in user_items.iterrows()}
                     selected_target_str = st.selectbox("Choose active item:", list(item_options.keys()))
                     target_id = item_options[selected_target_str]
                     matching_idx = df_trades[df_trades['id'] == target_id].index[0]
@@ -474,7 +506,7 @@ with tab1:
                             st.rerun()
 
     st.subheader(T["active_listings"])
-    global_promo_input = st.text_input(T["global_coupon_label"], placeholder=T["global_coupon_placeholder"]).strip().upper() if st.session_state.current_user else ""
+    global_promo_input = st.text_input(T["global_coupon_label"], placeholder=T["global_coupon_placeholder"]).strip().upper() if active_session_user else ""
 
     if df_trades.empty or 'item' not in df_trades.columns:
         st.write(T["no_items"])
@@ -512,7 +544,7 @@ with tab1:
                     
                     times_used = 0
                     if not df_claimed.empty and "code" in df_claimed.columns:
-                        times_used = len(df_claimed[(df_claimed['username'].astype(str) == str(st.session_state.current_user)) & (df_claimed['code'].astype(str).str.upper() == global_promo_input)])
+                        times_used = len(df_claimed[(df_claimed['username'].astype(str) == str(active_session_user)) & (df_claimed['code'].astype(str).str.upper() == global_promo_input)])
                     
                     is_banned = False
                     if pd.notna(code_row.get('banned_items')) and str(code_row.get('banned_items')).strip():
@@ -520,7 +552,7 @@ with tab1:
                         for token in banned_tokens:
                             if token == row_id_str or token in item_name_lower: is_banned = True
 
-                    if code_row.get('creator', '').strip().lower() == str(st.session_state.current_user).lower():
+                    if code_row.get('creator', '').strip().lower() == str(active_session_user).lower() and st.session_state.current_user != "admin":
                         code_success_msg = "OWN_CODE_PROHIBITED"
                     elif is_banned: 
                         code_success_msg = "BLOCKED_BLACKLIST"
@@ -545,14 +577,15 @@ with tab1:
                 elif code_success_msg == "ALREADY_USED": st.error(T["code_already_used"])
                 elif code_success_msg: st.success(code_success_msg)
             with col2:
-                if st.session_state.current_user:
-                    if str(row.get('seller')).lower() != st.session_state.current_user.lower():
+                if active_session_user:
+                    # ─── ADMIN FEATURE: ADMIN CAN FORCE TERMINATE OR BUY ANY RUNNING LISTING ───
+                    if str(row.get('seller')).lower() != active_session_user.lower() or st.session_state.current_user == "admin":
                         if st.button("🛒 Buy / Lock Price", key=f"buy_lock_{row['id']}", use_container_width=True):
                             if df_pending is None:
                                 df_pending = pd.DataFrame(columns=["trade_id", "seller", "buyer", "item", "amount", "locked_price", "timestamp"])
                             
                             new_pending_entry = pd.DataFrame([{
-                                "trade_id": row['id'], "seller": row['seller'], "buyer": st.session_state.current_user,
+                                "trade_id": row['id'], "seller": row['seller'], "buyer": active_session_user,
                                 "item": row['item'], "amount": int(row['amount']), "locked_price": display_price,
                                 "timestamp": datetime.now().isoformat()
                             }])
@@ -563,7 +596,8 @@ with tab1:
                             save_sheet_data(st.session_state.df_trades, "trades")
                             st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation.")
                             st.rerun()
-                    else:
+                    
+                    if str(row.get('seller')).lower() == active_session_user.lower() or st.session_state.current_user == "admin":
                         if st.button("🗑️ Force Cancel/Delete", key=f"del_{row['id']}", use_container_width=True):
                             st.session_state.df_trades = df_trades.drop(idx)
                             save_sheet_data(st.session_state.df_trades, "trades")
@@ -574,8 +608,8 @@ with tab1:
     st.markdown("---")
     st.subheader("📈 Shop Sales & Purchase History Ledger" if lang == "English" else "📈 Kniha realizovaných prodejů a nákupů")
     if df_ledger is not None and not df_ledger.empty:
-        user_lower = str(st.session_state.current_user).lower() if st.session_state.current_user else ""
-        if user_lower == "admin":
+        user_lower = str(active_session_user).lower() if active_session_user else ""
+        if st.session_state.current_user == "admin":
             display_ledger_df = df_ledger
         else:
             display_ledger_df = df_ledger[(df_ledger['seller'].astype(str).str.lower() == user_lower) | (df_ledger['buyer'].astype(str).str.lower() == user_lower)]
@@ -594,14 +628,14 @@ with tab2:
     st.header(lang == "English" and "📜 Production & Delivery Orders Board" or "📜 Zakázky & Objednávky")
     df_orders = st.session_state.df_orders
     
-    if st.session_state.current_user:
+    if active_session_user:
         with st.expander(lang == "English" and "➕ Request New Supply Order" or "➕ Vytvořit novou zakázku"):
             req_item = st.text_input(lang == "English" and "Requested Item" or "Požadovaný Předmět").strip()
             req_qty = st.number_input(lang == "English" and "Target Qty" or "Cílové množství", min_value=1, value=80)
             req_reward = st.number_input(lang == "English" and "Reward (Diamonds)" or "Odměna (Diamanty)", min_value=1, value=5)
             if st.button(lang == "English" and "Broadcast Request" or "Odeslat objednávku"):
                 next_oid = int(df_orders["id"].max() + 1) if not df_orders.empty else 1
-                new_o = pd.DataFrame([{"id": next_oid, "buyer": st.session_state.current_user, "item": req_item, "target_qty": req_qty, "current_qty": 0, "reward_diamonds": req_reward}])
+                new_o = pd.DataFrame([{"id": next_oid, "buyer": active_session_user, "item": req_item, "target_qty": req_qty, "current_qty": 0, "reward_diamonds": req_reward}])
                 st.session_state.df_orders = pd.concat([df_orders, new_o], ignore_index=True)
                 save_sheet_data(st.session_state.df_orders, "orders")
                 st.rerun()
@@ -618,7 +652,7 @@ with tab2:
             st.progress(min(1.0, curr/target))
             st.write(f"Status: {curr} / {target} ({max(0, target-curr)} remaining) | Reward: {o_row['reward_diamonds']} 💎")
             
-            if st.session_state.current_user in ["admin", o_row['buyer']]:
+            if st.session_state.current_user == "admin" or active_session_user == o_row['buyer']:
                 c_val, c_del = st.columns([3, 1])
                 with c_val:
                     new_curr_input = st.number_input(f"Update Shipped Qty (Order #{order_id})", min_value=0, max_value=target, value=curr, key=f"inp_{order_id}")
@@ -642,7 +676,7 @@ with tab3:
     df_jail = st.session_state.df_jail
     
     st.subheader(lang == "English" and "🕵️ Teleport Quota Checker" or "🕵️ Kontrola kvóty teleportů")
-    tp_username = st.text_input(lang == "English" and "Player Minecraft Account Name" or "Minecraft jméno hráče", value=st.session_state.current_user if st.session_state.current_user else "").strip().lower()
+    tp_username = st.text_input(lang == "English" and "Player Minecraft Account Name" or "Minecraft jméno hráče", value=active_session_user if active_session_user else "").strip().lower()
     
     if tp_username:
         if df_tps is None or df_tps.empty or 'username' not in df_tps.columns:
@@ -661,12 +695,10 @@ with tab3:
             
         st.metric(lang == "English" and "Teleports Available Today" or "Dnes zbývající teleporty", f"{curr_tps} / {MAX_TPS}")
         
-        # --- ADMIN +/- 1 CONTROL LOGIC & MANUAL INT INPUT CONFIGURATION ---
         if st.session_state.current_user == "admin":
             st.markdown("##### 🛠️ Admin Quota Quick Modification")
             match_idx = df_tps[df_tps['username'].astype(str).str.lower() == tp_username].index[0]
             
-            # 1. Direct Integer Input Box Override
             new_tp_selection = st.number_input("Set Teleport Balance Value:", min_value=0, max_value=100, value=curr_tps, key="admin_tp_int")
             if new_tp_selection != curr_tps:
                 df_tps.at[match_idx, 'remaining_tps'] = int(new_tp_selection)
@@ -674,7 +706,6 @@ with tab3:
                 save_sheet_data(df_tps, "tps")
                 st.rerun()
                 
-            # 2. Step Buttons (+1 / -1)
             c_plus, c_minus = st.columns(2)
             with c_plus:
                 if st.button("➕ Add 1 Teleport Token", use_container_width=True):
@@ -739,7 +770,7 @@ with tab4:
     df_trades = st.session_state.df_trades
     df_claimed = st.session_state.df_claimed
     
-    if st.session_state.current_user:
+    if active_session_user:
         with st.expander(T["create_code"]):
             new_code_str = st.text_input(T["code_input"], value="VOLBA25").strip().upper()
             code_discount = st.slider(T["code_pct"], 1, 100, 15)
@@ -765,11 +796,11 @@ with tab4:
                         
                         already_claimed_count = 0
                         if not df_claimed.empty and "code" in df_claimed.columns:
-                            already_claimed_count = len(df_claimed[(df_claimed['username'].astype(str) == str(st.session_state.current_user)) & (df_claimed['code'].astype(str).str.upper() == new_code_str)])
+                            already_claimed_count = len(df_claimed[(df_claimed['username'].astype(str) == str(active_session_user)) & (df_claimed['code'].astype(str).str.upper() == new_code_str)])
                         
                         remaining_slots = max(0, max_allowed_uses - already_claimed_count)
                         if remaining_slots > 0:
-                            bulk_claims = [{"username": st.session_state.current_user, "code": new_code_str} for _ in range(remaining_slots)]
+                            bulk_claims = [{"username": active_session_user, "code": new_code_str} for _ in range(remaining_slots)]
                             df_claims_new = pd.DataFrame(bulk_claims)
                             st.session_state.df_claimed = pd.concat([df_claimed, df_claims_new], ignore_index=True)
                             save_sheet_data(st.session_state.df_claimed, "claimed_codes")
@@ -783,13 +814,13 @@ with tab4:
                                 matched_listing = df_trades[df_trades['id'].astype(float) == float(token)]
                                 if not matched_listing.empty:
                                     listing_owner = str(matched_listing.iloc[0].get('seller', '')).strip().lower()
-                                    if listing_owner != st.session_state.current_user.lower() and st.session_state.current_user.lower() != "admin":
+                                    if listing_owner != active_session_user.lower() and st.session_state.current_user != "admin":
                                         passed_ownership_check = False
                         
                         if not passed_ownership_check:
                             st.error(T["not_owned_err"])
                         else:
-                            new_entry = pd.DataFrame([{"code": new_code_str, "creator": st.session_state.current_user, "discount": code_discount, "target_ids": target_ids_val, "banned_items": banned_items_input.strip(), "max_uses": usage_limit}])
+                            new_entry = pd.DataFrame([{"code": new_code_str, "creator": active_session_user, "discount": code_discount, "target_ids": target_ids_val, "banned_items": banned_items_input.strip(), "max_uses": usage_limit}])
                             st.session_state.df_codes = pd.concat([df_codes, new_entry], ignore_index=True)
                             save_sheet_data(st.session_state.df_codes, "codes")
                             st.rerun()
@@ -800,9 +831,10 @@ with tab4:
             for c_idx, c_row in df_codes.iterrows():
                 current_code_name = str(c_row['code']).upper()
                 creator_lower = str(c_row.get('creator', '')).strip().lower()
-                viewer_lower = st.session_state.current_user.lower()
+                viewer_lower = active_session_user.lower()
                 
-                if viewer_lower == "admin" or creator_lower == viewer_lower:
+                # ─── ADMIN FEATURE: ADMIN VISUALIZES AND CONTROLS EVERY CODE GLOBALLY ───
+                if st.session_state.current_user == "admin" or creator_lower == viewer_lower:
                     code_claims_df = pd.DataFrame()
                     claims_count = 0
                     if not df_claimed.empty and "code" in df_claimed.columns:
@@ -828,6 +860,18 @@ with tab4:
                                     save_sheet_data(st.session_state.df_claimed, "claimed_codes")
                                     st.rerun()
                         
+                        # ─── ADMIN FEATURE: ADMIN MANUALLY INJECTS CUSTOM TARGET CLAIMS ───
+                        if st.session_state.current_user == "admin":
+                            with st.expander("🛠️ Admin: Inject New Code Target Usage Entry"):
+                                inject_target_user = st.text_input("Username to record use for:", key=f"inj_usr_{current_code_name}").strip().lower()
+                                if st.button("Force Inject Custom Claim Entry", key=f"inj_btn_{current_code_name}"):
+                                    if inject_target_user:
+                                        new_claim_row = pd.DataFrame([{"username": inject_target_user, "code": current_code_name}])
+                                        st.session_state.df_claimed = pd.concat([df_claimed, new_claim_row], ignore_index=True)
+                                        save_sheet_data(st.session_state.df_claimed, "claimed_codes")
+                                        st.success(f"Injected usage claim entry for {inject_target_user}!")
+                                        st.rerun()
+
                         if claims_count > 0:
                             with st.expander(f"🔍 View Users / Delete Specific Usage ({claims_count})"):
                                 for claim_idx, claim_row in code_claims_df.iterrows():
