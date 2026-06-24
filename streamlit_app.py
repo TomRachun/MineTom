@@ -112,7 +112,23 @@ LOCALES = {
         "code_already_used": "⚠️ You have reached the usage limit for this code!",
         "code_banned_expl": "🚫 Banned Item Names or Listing IDs (Comma Separated)",
         "code_blocked_msg": "🚫 Code blocked! This item or listing ID is blacklisted by the shop owner.",
-        "not_owned_err": "⚠️ Security Alert: You cannot blacklist Listing IDs that you do not own!"
+        "not_owned_err": "⚠️ Security Alert: You cannot blacklist Listing IDs that you do not own!",
+        "stock_settings_header": "##### 📦 Stock Settings",
+        "stock_label": "Stock / Quantity Available",
+        "stock_infinite": "♾️ Infinite Stock (Until Manually Removed)",
+        "stock_remaining": "📦 Stock Remaining:",
+        "stock_unlimited": "♾️ Unlimited",
+        "stock_adjust_header": "##### 📦 Adjust Stock / Quantity Available",
+        "stock_set_infinite_btn": "Set to Infinite Stock",
+        "stock_update_btn": "Update Stock Amount",
+        "filter_label": "🔍 Filter Listings",
+        "filter_all": "All",
+        "filter_on_sale": "🔥 On Sale",
+        "filter_upcoming": "⏳ Upcoming Sales",
+        "filter_ending_soon": "⌛ Ending Soonest",
+        "filter_auctions": "🔨 Auctions",
+        "filter_free": "🎁 Free Items",
+        "filter_other": "📦 Other"
     },
     "Čeština": {
         "title": "⛏️ Minecraft Server Portál Správy",
@@ -164,7 +180,23 @@ LOCALES = {
         "code_already_used": "⚠️ Dosáhl jsi limitu použití tohoto kódu!",
         "code_banned_expl": "🚫 Zakázané názvy předmětů nebo ID nabídek (oddělené čárkou)",
         "code_blocked_msg": "🚫 Kód zablokován! Tento předmět nebo ID nabídky je majitelem na černé listině.",
-        "not_owned_err": "⚠️ Bezpečnostní upozornění: Nemůžete zablokovat ID nabídek, které nevlastníte!"
+        "not_owned_err": "⚠️ Bezpečnostní upozornění: Nemůžete zablokovat ID nabídek, které nevlastníte!",
+        "stock_settings_header": "##### 📦 Nastavení Skladu",
+        "stock_label": "Sklad / Dostupné Množství",
+        "stock_infinite": "♾️ Neomezený Sklad (Dokud Nesmažete Ručně)",
+        "stock_remaining": "📦 Zbývající Sklad:",
+        "stock_unlimited": "♾️ Neomezeno",
+        "stock_adjust_header": "##### 📦 Upravit Sklad / Dostupné Množství",
+        "stock_set_infinite_btn": "Nastavit na Neomezený Sklad",
+        "stock_update_btn": "Aktualizovat Množství Skladu",
+        "filter_label": "🔍 Filtrovat Nabídky",
+        "filter_all": "Vše",
+        "filter_on_sale": "🔥 Ve Slevě",
+        "filter_upcoming": "⏳ Nadcházející Slevy",
+        "filter_ending_soon": "⌛ Nejdříve Končící",
+        "filter_auctions": "🔨 Aukce",
+        "filter_free": "🎁 Zdarma",
+        "filter_other": "📦 Ostatní"
     }
 }
 
@@ -190,7 +222,7 @@ def get_sheet_data(worksheet_name):
 def save_sheet_data(df, worksheet_name):
     if "gsheets_write_url" not in st.secrets: return
     if worksheet_name == "users": cols = ["username", "password"]
-    elif worksheet_name == "trades": cols = ["id", "seller", "item", "amount", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder"]
+    elif worksheet_name == "trades": cols = ["id", "seller", "item", "amount", "enchants", "price", "created_at", "expires_at", "sale_price", "sale_at", "is_auction", "highest_bid", "highest_bidder", "stock"]
     elif worksheet_name == "codes": cols = ["code", "creator", "discount", "target_ids", "banned_items", "max_uses"]
     elif worksheet_name == "claimed_codes": cols = ["username", "code"]
     elif worksheet_name == "tps": cols = ["username", "remaining_tps"]
@@ -251,6 +283,14 @@ if st.button(T["refresh_btn"], use_container_width=True):
 
 # Determine active context user (True identity vs Spoofed choice)
 active_session_user = st.session_state.impersonated_user if st.session_state.impersonated_user else st.session_state.current_user
+
+# ─── TRUE ADMIN-ACTING-AS-ADMIN FLAG ───
+# This is True only when the logged in user IS admin AND admin is NOT currently
+# impersonating anyone. Whenever admin impersonates a player, every admin-only
+# control in the MAIN CONTENT (tabs) is hidden so the page reflects exactly what
+# that player would see. The SIDEBAR (impersonation switcher, password tools,
+# logout) is intentionally left untouched so the admin never loses control.
+is_admin_acting_as_admin = (st.session_state.current_user == "admin") and (st.session_state.impersonated_user is None)
 
 # Authentication UI
 st.sidebar.header(T["auth_header"])
@@ -355,6 +395,14 @@ with tab1:
             if is_enchantable:
                 text_input = st.text_input(T["enchants_placeholder"])
                 enchants = [e.strip() for e in text_input.split(",") if e.strip()]
+
+            st.markdown(T["stock_settings_header"])
+            stock_infinite_create = st.checkbox(T["stock_infinite"])
+            if stock_infinite_create:
+                stock_val_input = "INF"
+                st.caption(T["stock_unlimited"])
+            else:
+                stock_val_input = st.number_input(T["stock_label"], min_value=1, value=1)
             
             listing_type = st.radio(T["format"], ["Standard Fix Price", "Flash Sale / Discount", "Scheduled Sale Delay", "Auction (Bidding)"])
             force_free_on_create = st.checkbox("🎁 Make this listing entirely FREE from the start")
@@ -413,7 +461,8 @@ with tab1:
                         "id": next_id, "seller": active_session_user, "item": final_item_name,
                         "amount": int(item_amount_val), "enchants": str(enchants), "price": price_string,
                         "created_at": datetime.now().isoformat(), "expires_at": exp_time, "sale_price": sale_price_val,
-                        "sale_at": sale_at_val, "is_auction": is_auction_val, "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": ""
+                        "sale_at": sale_at_val, "is_auction": is_auction_val, "highest_bid": base_price_val if is_auction_val else "", "highest_bidder": "",
+                        "stock": stock_val_input
                     }])
                     st.session_state.df_trades = pd.concat([df_trades, new_trade], ignore_index=True)
                     save_sheet_data(st.session_state.df_trades, "trades")
@@ -423,8 +472,8 @@ with tab1:
         with st.expander("🏷️ Shop Owner Control Panel & Pending Approvals"):
             st.markdown("#### ⏳ Pending Sales Awaiting Your Confirmation")
             if df_pending is not None and not df_pending.empty:
-                # ─── ADMIN FEATURE: ADMIN CAN SEE AND CONTROL ALL SALES GLOBLALLY ───
-                if st.session_state.current_user == "admin":
+                # ─── ADMIN FEATURE: ADMIN CAN SEE AND CONTROL ALL SALES GLOBLALLY (hidden while impersonating) ───
+                if is_admin_acting_as_admin:
                     my_pending = df_pending
                 else:
                     my_pending = df_pending[df_pending['seller'].astype(str).str.lower() == active_session_user.lower()]
@@ -463,8 +512,8 @@ with tab1:
             
             st.markdown("#### ⚙️ Edit Active Run-time Items")
             if not df_trades.empty and 'seller' in df_trades.columns:
-                # ─── ADMIN FEATURE: ADMIN CONTROLS ALL USERS' ACTIVE RUN-TIME ITEMS ───
-                if st.session_state.current_user == "admin":
+                # ─── ADMIN FEATURE: ADMIN CONTROLS ALL USERS' ACTIVE RUN-TIME ITEMS (hidden while impersonating) ───
+                if is_admin_acting_as_admin:
                     user_items = df_trades[df_trades['is_auction'] == False]
                 else:
                     user_items = df_trades[(df_trades['seller'].astype(str).str.lower() == active_session_user.lower()) & (df_trades['is_auction'] == False)]
@@ -505,13 +554,63 @@ with tab1:
                             st.success("Listing updated to Free!")
                             st.rerun()
 
+                    st.markdown(T["stock_adjust_header"])
+                    current_stock_raw = str(df_trades.at[matching_idx, 'stock']).strip() if 'stock' in df_trades.columns else "1"
+                    is_currently_infinite = current_stock_raw.upper() == "INF"
+                    new_infinite = st.checkbox(T["stock_infinite"], value=is_currently_infinite, key=f"stockinf_{target_id}")
+                    if new_infinite:
+                        if st.button(T["stock_set_infinite_btn"], use_container_width=True, key=f"setinf_{target_id}"):
+                            df_trades.at[matching_idx, 'stock'] = "INF"
+                            save_sheet_data(df_trades, "trades")
+                            st.success("Stock set to infinite!")
+                            st.rerun()
+                    else:
+                        default_stock_val = 1 if is_currently_infinite or current_stock_raw in ["", "nan"] else int(float(current_stock_raw))
+                        new_stock_val = st.number_input(T["stock_label"], min_value=1, value=default_stock_val, key=f"stockval_{target_id}")
+                        if st.button(T["stock_update_btn"], use_container_width=True, key=f"setstock_{target_id}"):
+                            df_trades.at[matching_idx, 'stock'] = int(new_stock_val)
+                            save_sheet_data(df_trades, "trades")
+                            st.success("Stock amount updated!")
+                            st.rerun()
+
     st.subheader(T["active_listings"])
     global_promo_input = st.text_input(T["global_coupon_label"], placeholder=T["global_coupon_placeholder"]).strip().upper() if active_session_user else ""
 
-    if df_trades.empty or 'item' not in df_trades.columns:
+    filter_choice = st.selectbox(T["filter_label"], [T["filter_all"], T["filter_on_sale"], T["filter_upcoming"], T["filter_ending_soon"], T["filter_auctions"], T["filter_free"], T["filter_other"]])
+
+    df_view = df_trades.copy()
+    if not df_view.empty and 'item' in df_view.columns:
+        def _is_on_sale_row(r):
+            return "SALE" in str(r.get('price', '')).upper() and "DELAYED_" not in str(r.get('sale_price', ''))
+        def _is_upcoming_row(r):
+            return "DELAYED_" in str(r.get('sale_price', '')) and str(r.get('sale_at', '')).strip() not in ["", "nan"]
+        def _is_auction_row(r):
+            return str(r.get('is_auction', '')).strip().lower() == "true"
+        def _is_free_row(r):
+            return "FREE" in str(r.get('price', '')).upper()
+        def _seconds_left_row(r):
+            exp = str(r.get('expires_at', '')).strip()
+            if exp in ["", "nan", "Permanent"]: return float('inf')
+            try: return (datetime.fromisoformat(exp) - datetime.now()).total_seconds()
+            except: return float('inf')
+
+        if filter_choice == T["filter_on_sale"]:
+            df_view = df_view[df_view.apply(_is_on_sale_row, axis=1)]
+        elif filter_choice == T["filter_upcoming"]:
+            df_view = df_view[df_view.apply(_is_upcoming_row, axis=1)]
+        elif filter_choice == T["filter_auctions"]:
+            df_view = df_view[df_view.apply(_is_auction_row, axis=1)]
+        elif filter_choice == T["filter_free"]:
+            df_view = df_view[df_view.apply(_is_free_row, axis=1)]
+        elif filter_choice == T["filter_other"]:
+            df_view = df_view[~df_view.apply(lambda r: _is_on_sale_row(r) or _is_upcoming_row(r) or _is_auction_row(r) or _is_free_row(r), axis=1)]
+        elif filter_choice == T["filter_ending_soon"]:
+            df_view = df_view.assign(_secs_left=df_view.apply(_seconds_left_row, axis=1)).sort_values("_secs_left").drop(columns="_secs_left")
+
+    if df_view.empty or 'item' not in df_view.columns:
         st.write(T["no_items"])
     else:
-        for idx, row in df_trades.iterrows():
+        for idx, row in df_view.iterrows():
             col1, col2 = st.columns([4, 2])
             display_price = str(row.get('price', 'Free'))
             item_name_lower = str(row.get('item', '')).lower()
@@ -552,7 +651,7 @@ with tab1:
                         for token in banned_tokens:
                             if token == row_id_str or token in item_name_lower: is_banned = True
 
-                    if code_row.get('creator', '').strip().lower() == str(active_session_user).lower() and st.session_state.current_user != "admin":
+                    if code_row.get('creator', '').strip().lower() == str(active_session_user).lower() and not is_admin_acting_as_admin:
                         code_success_msg = "OWN_CODE_PROHIBITED"
                     elif is_banned: 
                         code_success_msg = "BLOCKED_BLACKLIST"
@@ -567,6 +666,12 @@ with tab1:
             with col1:
                 st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({row['amount']}x)**")
                 st.markdown(f"Price: **{display_price}**")
+
+                stock_display_raw = str(row.get('stock', '1')).strip()
+                if stock_display_raw.upper() == "INF":
+                    st.caption(f"{T['stock_remaining']} {T['stock_unlimited']}")
+                elif stock_display_raw not in ["", "nan"]:
+                    st.caption(f"{T['stock_remaining']} {stock_display_raw}")
                 
                 if "DELAYED_" in sale_price_field and datetime.now() < datetime.fromisoformat(sale_at_field):
                     st.info(f"⏳ Scheduled Markdown starting in: {format_time_remaining(sale_at_field)}")
@@ -578,8 +683,8 @@ with tab1:
                 elif code_success_msg: st.success(code_success_msg)
             with col2:
                 if active_session_user:
-                    # ─── ADMIN FEATURE: ADMIN CAN FORCE TERMINATE OR BUY ANY RUNNING LISTING ───
-                    if str(row.get('seller')).lower() != active_session_user.lower() or st.session_state.current_user == "admin":
+                    # ─── ADMIN FEATURE: ADMIN CAN FORCE TERMINATE OR BUY ANY RUNNING LISTING (hidden while impersonating) ───
+                    if str(row.get('seller')).lower() != active_session_user.lower() or is_admin_acting_as_admin:
                         if st.button("🛒 Buy / Lock Price", key=f"buy_lock_{row['id']}", use_container_width=True):
                             if df_pending is None:
                                 df_pending = pd.DataFrame(columns=["trade_id", "seller", "buyer", "item", "amount", "locked_price", "timestamp"])
@@ -591,13 +696,29 @@ with tab1:
                             }])
                             st.session_state.df_pending = pd.concat([df_pending, new_pending_entry], ignore_index=True)
                             save_sheet_data(st.session_state.df_pending, "pending_buys")
-                            
-                            st.session_state.df_trades = df_trades.drop(idx)
-                            save_sheet_data(st.session_state.df_trades, "trades")
-                            st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation.")
+
+                            stock_raw_buy = str(row.get('stock', '1')).strip()
+                            is_infinite_buy = stock_raw_buy.upper() == "INF"
+                            if is_infinite_buy:
+                                st.session_state.df_trades = df_trades
+                                st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation. (♾️ Unlimited stock remains)")
+                            else:
+                                try:
+                                    stock_count_buy = int(float(stock_raw_buy)) if stock_raw_buy not in ["", "nan"] else 1
+                                except:
+                                    stock_count_buy = 1
+                                if stock_count_buy > 1:
+                                    df_trades.at[idx, 'stock'] = stock_count_buy - 1
+                                    st.session_state.df_trades = df_trades
+                                    save_sheet_data(st.session_state.df_trades, "trades")
+                                    st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation. ({stock_count_buy - 1} left in stock)")
+                                else:
+                                    st.session_state.df_trades = df_trades.drop(idx)
+                                    save_sheet_data(st.session_state.df_trades, "trades")
+                                    st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation.")
                             st.rerun()
                     
-                    if str(row.get('seller')).lower() == active_session_user.lower() or st.session_state.current_user == "admin":
+                    if str(row.get('seller')).lower() == active_session_user.lower() or is_admin_acting_as_admin:
                         if st.button("🗑️ Force Cancel/Delete", key=f"del_{row['id']}", use_container_width=True):
                             st.session_state.df_trades = df_trades.drop(idx)
                             save_sheet_data(st.session_state.df_trades, "trades")
@@ -609,7 +730,7 @@ with tab1:
     st.subheader("📈 Shop Sales & Purchase History Ledger" if lang == "English" else "📈 Kniha realizovaných prodejů a nákupů")
     if df_ledger is not None and not df_ledger.empty:
         user_lower = str(active_session_user).lower() if active_session_user else ""
-        if st.session_state.current_user == "admin":
+        if is_admin_acting_as_admin:
             display_ledger_df = df_ledger
         else:
             display_ledger_df = df_ledger[(df_ledger['seller'].astype(str).str.lower() == user_lower) | (df_ledger['buyer'].astype(str).str.lower() == user_lower)]
@@ -652,7 +773,7 @@ with tab2:
             st.progress(min(1.0, curr/target))
             st.write(f"Status: {curr} / {target} ({max(0, target-curr)} remaining) | Reward: {o_row['reward_diamonds']} 💎")
             
-            if st.session_state.current_user == "admin" or active_session_user == o_row['buyer']:
+            if is_admin_acting_as_admin or active_session_user == o_row['buyer']:
                 c_val, c_del = st.columns([3, 1])
                 with c_val:
                     new_curr_input = st.number_input(f"Update Shipped Qty (Order #{order_id})", min_value=0, max_value=target, value=curr, key=f"inp_{order_id}")
@@ -695,11 +816,18 @@ with tab3:
             
         st.metric(lang == "English" and "Teleports Available Today" or "Dnes zbývající teleporty", f"{curr_tps} / {MAX_TPS}")
         
-        if st.session_state.current_user == "admin":
+        if is_admin_acting_as_admin:
             st.markdown("##### 🛠️ Admin Quota Quick Modification")
             match_idx = df_tps[df_tps['username'].astype(str).str.lower() == tp_username].index[0]
-            
-            new_tp_selection = st.number_input("Set Teleport Balance Value:", min_value=0, max_value=100, value=curr_tps, key="admin_tp_int")
+
+            # NOTE: the widget key is scoped per-username AND we explicitly clear it
+            # whenever the +/-1 buttons change the value behind its back. Streamlit
+            # widgets with an explicit `key` ignore the `value=` argument on rerun once
+            # the key already exists in session_state - that mismatch was the cause of
+            # the "+1 gets silently reverted a moment later" bug (the stale widget value
+            # was being treated as a fresh manual edit and re-saved over the new value).
+            tp_widget_key = f"admin_tp_int_{tp_username}"
+            new_tp_selection = st.number_input("Set Teleport Balance Value:", min_value=0, max_value=100, value=curr_tps, key=tp_widget_key)
             if new_tp_selection != curr_tps:
                 df_tps.at[match_idx, 'remaining_tps'] = int(new_tp_selection)
                 st.session_state.df_tps = df_tps
@@ -712,18 +840,20 @@ with tab3:
                     df_tps.at[match_idx, 'remaining_tps'] = curr_tps + 1
                     st.session_state.df_tps = df_tps
                     save_sheet_data(df_tps, "tps")
+                    st.session_state.pop(tp_widget_key, None)
                     st.rerun()
             with c_minus:
                 if st.button("➖ Deduct 1 Teleport Token", use_container_width=True):
                     df_tps.at[match_idx, 'remaining_tps'] = max(0, curr_tps - 1)
                     st.session_state.df_tps = df_tps
                     save_sheet_data(df_tps, "tps")
+                    st.session_state.pop(tp_widget_key, None)
                     st.rerun()
 
     st.markdown("---")
     
     st.subheader(lang == "English" and "⚖️ Server Prison & Jail Registry" or "⚖️ Serverový Vězeňský Rejstřík (Tresty)")
-    if st.session_state.current_user == "admin":
+    if is_admin_acting_as_admin:
         with st.expander(lang == "English" and "🚨 Sentence Player to Jail" or "🚨 Uvěznit / Potrestat hráče"):
             jail_user = st.text_input(lang == "English" and "Convicted Player Username" or "Uživatelské jméno hříšníka").strip().lower()
             jail_reason = st.text_input(lang == "English" and "Crime / Reason for Sentence" or "Důvod trestu / Přestupek")
@@ -754,7 +884,7 @@ with tab3:
                 st.warning(f"🔒 **{j_row['username'].upper()}**")
                 st.write(f"**{lang == 'English' and 'Reason' or 'Důvod'}:** {j_row['jail_reason']}")
                 st.caption(f"Remaining: {format_time_remaining(j_row['jail_until'])}")
-                if st.session_state.current_user == "admin":
+                if is_admin_acting_as_admin:
                     if st.button("Pardon / Release", key=f"unjail_{j_row['username']}"):
                         df_jail.at[j_idx, 'jail_reason'] = ""
                         df_jail.at[j_idx, 'jail_until'] = ""
@@ -814,7 +944,7 @@ with tab4:
                                 matched_listing = df_trades[df_trades['id'].astype(float) == float(token)]
                                 if not matched_listing.empty:
                                     listing_owner = str(matched_listing.iloc[0].get('seller', '')).strip().lower()
-                                    if listing_owner != active_session_user.lower() and st.session_state.current_user != "admin":
+                                    if listing_owner != active_session_user.lower() and not is_admin_acting_as_admin:
                                         passed_ownership_check = False
                         
                         if not passed_ownership_check:
@@ -833,8 +963,8 @@ with tab4:
                 creator_lower = str(c_row.get('creator', '')).strip().lower()
                 viewer_lower = active_session_user.lower()
                 
-                # ─── ADMIN FEATURE: ADMIN VISUALIZES AND CONTROLS EVERY CODE GLOBALLY ───
-                if st.session_state.current_user == "admin" or creator_lower == viewer_lower:
+                # ─── ADMIN FEATURE: ADMIN VISUALIZES AND CONTROLS EVERY CODE GLOBALLY (hidden while impersonating) ───
+                if is_admin_acting_as_admin or creator_lower == viewer_lower:
                     code_claims_df = pd.DataFrame()
                     claims_count = 0
                     if not df_claimed.empty and "code" in df_claimed.columns:
@@ -860,8 +990,8 @@ with tab4:
                                     save_sheet_data(st.session_state.df_claimed, "claimed_codes")
                                     st.rerun()
                         
-                        # ─── ADMIN FEATURE: ADMIN MANUALLY INJECTS CUSTOM TARGET CLAIMS ───
-                        if st.session_state.current_user == "admin":
+                        # ─── ADMIN FEATURE: ADMIN MANUALLY INJECTS CUSTOM TARGET CLAIMS (hidden while impersonating) ───
+                        if is_admin_acting_as_admin:
                             with st.expander("🛠️ Admin: Inject New Code Target Usage Entry"):
                                 inject_target_user = st.text_input("Username to record use for:", key=f"inj_usr_{current_code_name}").strip().lower()
                                 if st.button("Force Inject Custom Claim Entry", key=f"inj_btn_{current_code_name}"):
