@@ -406,10 +406,10 @@ with tab1:
                     st.caption("No one is waiting for delivery right now.")
                 else:
                     for p_idx, p_row in my_pending.iterrows():
-                        st.info(f"👤 **{p_row['buyer']}** wants to buy **{p_row['amount']}x** of **{p_row['item']}** for the locked price of **{p_row['locked_price']}**")
+                        st.info(f"👤 **{p_row['buyer']}** wants to buy **{p_row['item']}** ({p_row['amount']}x) for the locked price of **{p_row['locked_price']}**")
                         c_app, c_rej = st.columns(2)
                         with c_app:
-                            if st.button(f"✅ Confirm Delivery & Payment", key=f"app_{p_idx}"):
+                            if st.button(f"✅ Accept Buy & Deliver (Locked: {p_row['locked_price']})", key=f"app_{p_idx}"):
                                 if df_ledger is None or df_ledger.empty:
                                     df_ledger = pd.DataFrame(columns=["timestamp", "seller", "buyer", "item", "amount", "final_price"])
                                 record = pd.DataFrame([{
@@ -424,15 +424,10 @@ with tab1:
                                 st.success("Trade completed and archived!")
                                 st.rerun()
                         with c_rej:
-                            if st.button("❌ Deny Request & Return to Stock", key=f"rej_{p_idx}"):
-                                # Return stock back to the listing if it still exists
-                                orig_trade_id = p_row['trade_id']
-                                if orig_trade_id in df_trades['id'].values:
-                                    df_trades.loc[df_trades['id'] == orig_trade_id, 'amount'] += int(p_row['amount'])
-                                    save_sheet_data(df_trades, "trades")
+                            if st.button("❌ Deny & Put Item Back Online", key=f"rej_{p_idx}"):
                                 st.session_state.df_pending = df_pending.drop(p_idx)
                                 save_sheet_data(st.session_state.df_pending, "pending_buys")
-                                st.warning("Request rejected and stock restored.")
+                                st.warning("Request rejected.")
                                 st.rerun()
             else:
                 st.caption("No pending requests.")
@@ -489,12 +484,7 @@ with tab1:
             display_price = str(row.get('price', 'Free'))
             item_name_lower = str(row.get('item', '')).lower()
             row_id_str = str(row.get('id', '')).strip()
-            max_stock = int(row.get('amount', 1))
             
-            if max_stock <= 0:
-                continue
-
-            # --- EVALUATE SCHEDULED AUTOMATIC SALES IN REAL-TIME ---
             sale_price_field = str(row.get('sale_price', ''))
             sale_at_field = str(row.get('sale_at', ''))
             if "DELAYED_" in sale_price_field and sale_at_field:
@@ -543,46 +533,35 @@ with tab1:
                         code_success_msg = f"{T['code_success']}"
 
             with col1:
-                st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({max_stock}x available)**")
+                st.markdown(f"**🛒 ID {row['id']}: {row['seller']} is selling {row['item']} ({row['amount']}x)**")
                 st.markdown(f"Price: **{display_price}**")
                 
                 if "DELAYED_" in sale_price_field and datetime.now() < datetime.fromisoformat(sale_at_field):
                     st.info(f"⏳ Scheduled Markdown starting in: {format_time_remaining(sale_at_field)}")
                     
                 if code_success_msg == "OWN_CODE_PROHIBITED": 
-                    st.warning("⚠️ Access Denied: You cannot use promo codes you created.")
+                    st.warning("⚠️ Access Denied: You cannot use promo codes you created. This code has been rendered invalid for your account.")
                 elif code_success_msg == "BLOCKED_BLACKLIST": st.error(T["code_blocked_msg"])
                 elif code_success_msg == "ALREADY_USED": st.error(T["code_already_used"])
                 elif code_success_msg: st.success(code_success_msg)
             with col2:
                 if st.session_state.current_user:
                     if str(row.get('seller')).lower() != st.session_state.current_user.lower():
-                        # --- QUANTITY SELECTOR FOR MULTIPLE PURCHASES ---
-                        buy_qty = st.number_input(f"Quantity to buy (ID {row['id']})", min_value=1, max_value=max_stock, value=1, key=f"qty_{row['id']}")
-                        
-                        if st.button("🛒 Request Buy / Lock Price", key=f"buy_lock_{row['id']}", use_container_width=True):
+                        if st.button("🛒 Buy / Lock Price", key=f"buy_lock_{row['id']}", use_container_width=True):
                             if df_pending is None:
                                 df_pending = pd.DataFrame(columns=["trade_id", "seller", "buyer", "item", "amount", "locked_price", "timestamp"])
                             
-                            # Lock down the purchase intent with specific quantity chosen
                             new_pending_entry = pd.DataFrame([{
                                 "trade_id": row['id'], "seller": row['seller'], "buyer": st.session_state.current_user,
-                                "item": row['item'], "amount": int(buy_qty), "locked_price": f"{display_price} (x{buy_qty})",
+                                "item": row['item'], "amount": int(row['amount']), "locked_price": display_price,
                                 "timestamp": datetime.now().isoformat()
                             }])
                             st.session_state.df_pending = pd.concat([df_pending, new_pending_entry], ignore_index=True)
                             save_sheet_data(st.session_state.df_pending, "pending_buys")
                             
-                            # Deduct stock instead of removing entirely unless stock hits zero
-                            remaining_stock = max_stock - buy_qty
-                            if remaining_stock <= 0:
-                                st.session_state.df_trades = df_trades.drop(idx)
-                            else:
-                                df_trades.at[idx, 'amount'] = remaining_stock
-                                st.session_state.df_trades = df_trades
-                                
+                            st.session_state.df_trades = df_trades.drop(idx)
                             save_sheet_data(st.session_state.df_trades, "trades")
-                            st.success(f"Locked in {buy_qty}x at {display_price}! Waiting for owner confirmation.")
+                            st.success(f"Locked at {display_price}! Waiting for shop owner delivery confirmation.")
                             st.rerun()
                     else:
                         if st.button("🗑️ Force Cancel/Delete", key=f"del_{row['id']}", use_container_width=True):
@@ -663,20 +642,52 @@ with tab3:
     df_jail = st.session_state.df_jail
     
     st.subheader(lang == "English" and "🕵️ Teleport Quota Checker" or "🕵️ Kontrola kvóty teleportů")
-    tp_username = st.text_input(lang == "English" and "Player Minecraft Account Name" or "Minecraft jméno hráče").strip().lower()
+    tp_username = st.text_input(lang == "English" and "Player Minecraft Account Name" or "Minecraft jméno hráče", value=st.session_state.current_user if st.session_state.current_user else "").strip().lower()
+    
     if tp_username:
-        if df_tps.empty or 'username' not in df_tps.columns:
+        if df_tps is None or df_tps.empty or 'username' not in df_tps.columns:
             df_tps = pd.DataFrame(columns=["username", "remaining_tps"])
             
         user_row = df_tps[df_tps['username'].astype(str).str.lower() == tp_username]
+        
         if user_row.empty:
-            new_tp = pd.DataFrame([{"username": tp_username, "remaining_tps": MAX_TPS}])
-            df_tps = pd.concat([df_tps, new_tp], ignore_index=True)
-            save_sheet_data(df_tps, "tps")
             curr_tps = MAX_TPS
+            new_tp = pd.DataFrame([{"username": tp_username, "remaining_tps": curr_tps}])
+            df_tps = pd.concat([df_tps, new_tp], ignore_index=True)
+            st.session_state.df_tps = df_tps
+            save_sheet_data(df_tps, "tps")
         else:
             curr_tps = int(user_row.iloc[0]['remaining_tps'])
+            
         st.metric(lang == "English" and "Teleports Available Today" or "Dnes zbývající teleporty", f"{curr_tps} / {MAX_TPS}")
+        
+        # --- ADMIN +/- 1 CONTROL LOGIC & MANUAL INT INPUT CONFIGURATION ---
+        if st.session_state.current_user == "admin":
+            st.markdown("##### 🛠️ Admin Quota Quick Modification")
+            match_idx = df_tps[df_tps['username'].astype(str).str.lower() == tp_username].index[0]
+            
+            # 1. Direct Integer Input Box Override
+            new_tp_selection = st.number_input("Set Teleport Balance Value:", min_value=0, max_value=100, value=curr_tps, key="admin_tp_int")
+            if new_tp_selection != curr_tps:
+                df_tps.at[match_idx, 'remaining_tps'] = int(new_tp_selection)
+                st.session_state.df_tps = df_tps
+                save_sheet_data(df_tps, "tps")
+                st.rerun()
+                
+            # 2. Step Buttons (+1 / -1)
+            c_plus, c_minus = st.columns(2)
+            with c_plus:
+                if st.button("➕ Add 1 Teleport Token", use_container_width=True):
+                    df_tps.at[match_idx, 'remaining_tps'] = curr_tps + 1
+                    st.session_state.df_tps = df_tps
+                    save_sheet_data(df_tps, "tps")
+                    st.rerun()
+            with c_minus:
+                if st.button("➖ Deduct 1 Teleport Token", use_container_width=True):
+                    df_tps.at[match_idx, 'remaining_tps'] = max(0, curr_tps - 1)
+                    st.session_state.df_tps = df_tps
+                    save_sheet_data(df_tps, "tps")
+                    st.rerun()
 
     st.markdown("---")
     
@@ -763,7 +774,7 @@ with tab4:
                             st.session_state.df_claimed = pd.concat([df_claimed, df_claims_new], ignore_index=True)
                             save_sheet_data(st.session_state.df_claimed, "claimed_codes")
                         
-                        st.error(f"❌ Duplicate generation blocked!")
+                        st.error(f"❌ Duplicate generation blocked! Code `{new_code_str}` already exists. All available uses have been consumed for your account and it is now permanently invalid for you.")
                     else:
                         passed_ownership_check = True
                         banned_tokens = [t.strip() for t in banned_items_input.split(",") if t.strip()]
